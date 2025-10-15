@@ -1,3 +1,71 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Apple-inspired minimalist base */
+:root {
+	--bg: #fbfbfd; /* canvas */
+	--fg: #1d1d1f; /* ink */
+	--muted: #86868b;
+  --primary: #0071e3; /* Apple blue */
+}
+
+html, body {
+	@apply bg-[var(--bg)] text-[var(--fg)] font-ui antialiased scroll-smooth;
+}
+
+/* Cards */
+.card {
+	@apply bg-white rounded-2xl shadow-soft border border-gray-100;
+}
+
+/* Buttons */
+.btn {
+	@apply inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium transition-all duration-200 ease-out;
+}
+.btn-primary {
+	@apply bg-primary text-white hover:bg-blue-600 shadow-sm;
+}
+.btn-ghost {
+	@apply bg-transparent hover:bg-gray-100 text-[var(--fg)];
+}
+.btn-danger {
+	@apply bg-rose-600 text-white hover:bg-rose-700;
+}
+
+/* Inputs */
+.input {
+	@apply w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary bg-white;
+}
+
+/* Headings */
+h1,h2,h3,h4 {
+	@apply tracking-tight;
+}
+
+h1 { @apply text-4xl md:text-5xl font-semibold; }
+h2 { @apply text-3xl md:text-4xl font-semibold; }
+h3 { @apply text-2xl md:text-3xl font-semibold; }
+h4 { @apply text-xl md:text-2xl font-semibold; }
+p  { @apply text-base md:text-lg text-[var(--muted)]; }
+
+/* Glassmorphism helpers */
+.glass {
+	backdrop-filter: saturate(180%) blur(14px);
+	background: rgba(255,255,255,0.72);
+}
+.nav-glass {
+	backdrop-filter: saturate(180%) blur(12px);
+	background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.66));
+	@apply border-b border-white/60;
+}
+
+/* Subtle gradient surfaces */
+.surface-grad { background: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%); }
+
+/* Icon style */
+.icon { @apply w-5 h-5 text-[var(--fg)] opacity-80; }
+
+/* Card hover */
+.card-hover { @apply transition-transform duration-200; }
+.card-hover:hover { transform: translateY(-2px); }
