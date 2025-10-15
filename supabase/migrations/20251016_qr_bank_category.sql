@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS public.payment_qr_bank_accounts (
   qr_template TEXT NOT NULL DEFAULT 'compact2',     -- vietqr template: compact, compact2, etc.
   description_template TEXT NOT NULL DEFAULT 'DH {order_number}', -- addInfo template with placeholders
   include_amount BOOLEAN NOT NULL DEFAULT TRUE,     -- include order amount in QR
+  -- Sepay API fields (optional)
+  sepay_client_id TEXT,
+  sepay_client_secret TEXT,
+  sepay_merchant_id TEXT,
+  sepay_api_url TEXT, -- e.g. https://api.sepay.vn/api/v1/payment/create
+  sepay_bank_id TEXT, -- bank_id theo Sepay (nếu cần)
   active BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order INT DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

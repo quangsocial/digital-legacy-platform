@@ -353,9 +353,17 @@ export default function PaymentMethodsManagement() {
                     <Field label="QR template"><input className="input" value={form.qr_template||'compact2'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, qr_template: e.target.value})))} placeholder="compact | compact2" /></Field>
                     <Field label="Mẫu mô tả (addInfo)"><input className="input" value={form.description_template||'DH {order_number}'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, description_template: e.target.value})))} placeholder="DH {order_number}" /></Field>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <input id="incAmount" type="checkbox" checked={!!form.include_amount} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, include_amount: e.target.checked})))} />
                     <label htmlFor="incAmount" className="text-sm">Nhúng số tiền vào QR</label>
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="font-semibold text-xs text-gray-500 mb-1">Tích hợp Sepay (nếu muốn dùng API động)</div>
+                    <Field label="Sepay Client ID"><input className="input" value={form.sepay_client_id||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sepay_client_id: e.target.value})))} placeholder="Client ID từ Sepay" /></Field>
+                    <Field label="Sepay Client Secret"><input className="input" value={form.sepay_client_secret||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sepay_client_secret: e.target.value})))} placeholder="Client Secret từ Sepay" /></Field>
+                    <Field label="Sepay Merchant ID"><input className="input" value={form.sepay_merchant_id||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sepay_merchant_id: e.target.value})))} placeholder="Merchant ID từ Sepay" /></Field>
+                    <Field label="Sepay API URL"><input className="input" value={form.sepay_api_url||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sepay_api_url: e.target.value})))} placeholder="https://api.sepay.vn/api/v1/payment/create" /></Field>
+                    <Field label="Sepay Bank ID"><input className="input" value={form.sepay_bank_id||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sepay_bank_id: e.target.value})))} placeholder="bank_id theo Sepay (nếu có)" /></Field>
                   </div>
                 </>
               )}

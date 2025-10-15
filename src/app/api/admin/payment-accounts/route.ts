@@ -56,7 +56,10 @@ export async function POST(request: Request) {
       paypal: { table: 'payment_paypal_accounts', fields: ['paypal_email','display_name','currency','active','sort_order'] },
       momo: { table: 'payment_momo_accounts', fields: ['momo_number','momo_account','qr_image_url','active','sort_order'] },
       crypto: { table: 'payment_crypto_wallets', fields: ['token','network','address','qr_image_url','memo_tag','active','sort_order'] },
-      qr_bank: { table: 'payment_qr_bank_accounts', fields: ['bank_code','bank_name','account_number','account_holder','qr_template','description_template','include_amount','active','sort_order'] },
+      qr_bank: { table: 'payment_qr_bank_accounts', fields: [
+        'bank_code','bank_name','account_number','account_holder','qr_template','description_template','include_amount',
+        'sepay_client_id','sepay_client_secret','sepay_merchant_id','sepay_api_url','sepay_bank_id',
+        'active','sort_order'] },
     }
     const meta = byCat[category]
     if (!meta) return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
