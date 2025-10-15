@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const accountId = searchParams.get('accountId')
-    const orderNumber = searchParams.get('orderNumber') || ''
+  const orderNumber = searchParams.get('orderNumber') || ''
     const amountStr = searchParams.get('amount')
     const amount = amountStr ? Number(amountStr) : undefined
     if (!accountId) return NextResponse.json({ error: 'Missing accountId' }, { status: 400 })
@@ -57,8 +57,10 @@ export async function GET(request: Request) {
     const accountNumber: string = acc.account_number
     const template: string = acc.qr_template || 'compact2'
     const includeAmount: boolean = !!acc.include_amount
-    let addInfo: string = (acc.description_template as string) || 'DH {order_number}'
-    addInfo = addInfo.replace('{order_number}', orderNumber)
+  let addInfo: string = (acc.description_template as string) || 'DH {order_number}'
+  // Nếu template đã có 'DH {order_number}', chỉ thay {order_number} bằng số, không thêm DH nữa
+  addInfo = addInfo.replace('{order_number}', orderNumber)
+  // Nếu addInfo chỉ là mã số, không có DH, thì vẫn giữ nguyên
 
     // Compose VietQR static link pattern
     // Example: https://img.vietqr.io/image/<bankCode>-<accountNumber>-<template>.png?amount=...&addInfo=...

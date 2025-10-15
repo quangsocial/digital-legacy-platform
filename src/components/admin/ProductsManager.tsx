@@ -212,7 +212,20 @@ export default function ProductsManager() {
                   <div className="font-medium">{p.name}</div>
                   <div className="text-xs text-gray-500">{p.category}</div>
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-600">{p.slug}</td>
+                <td className="px-4 py-2 text-sm text-gray-600 flex items-center gap-2">
+                  {p.slug}
+                  <a
+                    href={`/product/${p.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Xem trang sản phẩm"
+                    className="inline-flex items-center text-blue-500 hover:text-blue-700"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 ml-1">
+                      <path d="M12.293 2.293a1 1 0 0 1 1.414 0l4 4a1 1 0 0 1 0 1.414l-8.5 8.5a1 1 0 0 1-.325.217l-4 1.5a1 1 0 0 1-1.263-1.263l1.5-4a1 1 0 0 1 .217-.325l8.5-8.5ZM15 7l-2-2m-2.293 9.293 8.5-8.5a3 3 0 0 0-4.243-4.243l-8.5 8.5a3 3 0 0 0-.651 1.012l-1.5 4A3 3 0 0 0 5.293 19.207l4-1.5a3 3 0 0 0 1.012-.651Z" />
+                    </svg>
+                  </a>
+                </td>
                 <td className="px-4 py-2 text-sm">
                   <span className={`px-2 py-0.5 rounded-full text-xs ${p.status==='active'?'bg-emerald-100 text-emerald-700':p.status==='inactive'?'bg-amber-100 text-amber-700':'bg-gray-100 text-gray-700'}`}>{p.status}</span>
                 </td>
