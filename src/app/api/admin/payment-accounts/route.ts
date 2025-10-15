@@ -20,11 +20,12 @@ export async function GET() {
     if ('error' in auth) return auth.error
     const { admin } = auth
 
-    const [banks, paypals, momos, cryptos] = await Promise.all([
+    const [banks, paypals, momos, cryptos, qrBanks] = await Promise.all([
       admin.from('payment_bank_accounts').select('*').order('sort_order'),
       admin.from('payment_paypal_accounts').select('*').order('sort_order'),
       admin.from('payment_momo_accounts').select('*').order('sort_order'),
       admin.from('payment_crypto_wallets').select('*').order('sort_order'),
+      admin.from('payment_qr_bank_accounts').select('*').order('sort_order'),
     ])
 
     return NextResponse.json({
@@ -32,6 +33,7 @@ export async function GET() {
       paypal: paypals.data || [],
       momo: momos.data || [],
       crypto: cryptos.data || [],
+      qr_bank: qrBanks.data || [],
     })
   } catch (e) {
     console.error('GET /admin/payment-accounts', e)
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
       paypal: { table: 'payment_paypal_accounts', fields: ['paypal_email','display_name','currency','active','sort_order'] },
       momo: { table: 'payment_momo_accounts', fields: ['momo_number','momo_account','qr_image_url','active','sort_order'] },
       crypto: { table: 'payment_crypto_wallets', fields: ['token','network','address','qr_image_url','memo_tag','active','sort_order'] },
+      qr_bank: { table: 'payment_qr_bank_accounts', fields: ['bank_code','bank_name','account_number','account_holder','qr_template','description_template','include_amount','active','sort_order'] },
     }
     const meta = byCat[category]
     if (!meta) return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
@@ -84,7 +87,8 @@ export async function PATCH(request: Request) {
       bank: 'payment_bank_accounts',
       paypal: 'payment_paypal_accounts',
       momo: 'payment_momo_accounts',
-      crypto: 'payment_crypto_wallets',
+        crypto: 'payment_crypto_wallets',
+        qr_bank: 'payment_qr_bank_accounts',
     }
     const table = byCat[category]
     if (!table) return NextResponse.json({ error: 'Invalid category' }, { status: 400 })

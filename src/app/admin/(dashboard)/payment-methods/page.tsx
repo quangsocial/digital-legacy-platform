@@ -1,12 +1,12 @@
 "use client"
 import { useEffect, useMemo, useState, useTransition } from 'react'
 
-type Tab = 'all' | 'bank' | 'paypal' | 'momo' | 'crypto'
+type Tab = 'all' | 'bank' | 'paypal' | 'momo' | 'crypto' | 'qr_bank'
 type Category = Exclude<Tab, 'all'>
 
 export default function PaymentMethodsManagement() {
   const [tab, setTab] = useState<Tab>('all')
-  const [data, setData] = useState<any>({ bank: [], paypal: [], momo: [], crypto: [] })
+  const [data, setData] = useState<any>({ bank: [], paypal: [], momo: [], crypto: [], qr_bank: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string|null>(null)
   const [editing, setEditing] = useState<{ category: Category, id?: string }|null>(null)
@@ -33,8 +33,8 @@ export default function PaymentMethodsManagement() {
       setLoading(true)
       const res = await fetch('/api/admin/payment-accounts')
       if (!res.ok) throw new Error('failed')
-      const json = await res.json()
-      setData({ bank: json.bank||[], paypal: json.paypal||[], momo: json.momo||[], crypto: json.crypto||[] })
+  const json = await res.json()
+  setData({ bank: json.bank||[], paypal: json.paypal||[], momo: json.momo||[], crypto: json.crypto||[], qr_bank: json.qr_bank||[] })
     } catch {
       setError('Không tải được danh sách phương thức')
     } finally { setLoading(false) }
@@ -56,6 +56,7 @@ export default function PaymentMethodsManagement() {
       if (category === 'paypal') setForm({ paypal_email: '', display_name: '', currency: 'USD', active: true, sort_order: 0 })
       if (category === 'momo') setForm({ momo_number: '', momo_account: '', qr_url: '', qr_image_url: '', active: true, sort_order: 0 })
       if (category === 'crypto') setForm({ token: 'USDT', network: 'BSC', address: '', qr_url: '', qr_image_url: '', memo_tag: '', active: true, sort_order: 0 })
+      if (category === 'qr_bank') setForm({ bank_code: '', bank_name: '', account_number: '', account_holder: '', qr_template: 'compact2', description_template: 'DH {order_number}', include_amount: true, active: true, sort_order: 0 })
     })
   }
   const openEdit = (category: Category, item: any) => {
@@ -98,9 +99,10 @@ export default function PaymentMethodsManagement() {
         return params
       } catch { return {} }
     }
-    if (editing.category === 'bank') body.qr_params = extractParams(body.qr_url)
-    if (editing.category === 'momo') body.qr_params = extractParams(body.qr_url)
-    if (editing.category === 'crypto') body.qr_params = extractParams(body.qr_url)
+  if (editing.category === 'bank') body.qr_params = extractParams(body.qr_url)
+  if (editing.category === 'momo') body.qr_params = extractParams(body.qr_url)
+  if (editing.category === 'crypto') body.qr_params = extractParams(body.qr_url)
+  // qr_bank: no direct upload; values already normalized
     try {
       const res = await fetch('/api/admin/payment-accounts', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error('save failed')
@@ -122,12 +124,13 @@ export default function PaymentMethodsManagement() {
         cat==='bank' ? 'bg-blue-50 text-blue-700 border-blue-200' :
         cat==='paypal' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
         cat==='momo' ? 'bg-pink-50 text-pink-700 border-pink-200' :
-        cat==='crypto' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+        cat==='crypto' ? 'bg-amber-50 text-amber-700 border-amber-200' : cat==='qr_bank' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-50 text-gray-700 border-gray-200'
       }`}>
         {cat==='bank' && 'Bank'}
         {cat==='paypal' && 'PayPal'}
         {cat==='momo' && 'MoMo'}
         {cat==='crypto' && 'Crypto'}
+        {cat==='qr_bank' && 'QR Bank'}
       </span>
     )
 
@@ -137,6 +140,7 @@ export default function PaymentMethodsManagement() {
           ...(data.paypal||[]).map((i:any)=>({ item:i, cat:'paypal' as const })),
           ...(data.momo||[]).map((i:any)=>({ item:i, cat:'momo' as const })),
           ...(data.crypto||[]).map((i:any)=>({ item:i, cat:'crypto' as const })),
+          ...(data.qr_bank||[]).map((i:any)=>({ item:i, cat:'qr_bank' as const })),
         ]
       : (data[category] || []).map((i:any)=>({ item:i, cat: category as Exclude<Tab,'all'> }))
 
@@ -174,6 +178,13 @@ export default function PaymentMethodsManagement() {
                   <div className="break-all">{item.address}</div>
                 </div>
               )}
+              {cat==='qr_bank' && (
+                <div>
+                  <div className="font-medium">{item.bank_name}</div>
+                  <div>{item.account_number} — {item.account_holder}</div>
+                  <div className="text-xs text-gray-500">{item.bank_code} • {item.qr_template}</div>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <label className="relative inline-flex items-center cursor-pointer">
@@ -196,13 +207,14 @@ export default function PaymentMethodsManagement() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(['all','bank','paypal','momo','crypto'] as Tab[]).map(t => (
+        {(['all','bank','paypal','momo','crypto','qr_bank'] as Tab[]).map(t => (
           <button key={t} onClick={()=>setTab(t)} className={`px-3 py-1.5 rounded-full border ${tab===t ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300'}`}>
             {t==='all' && 'Tất cả'}
             {t==='bank' && 'Chuyển khoản ngân hàng'}
             {t==='paypal' && 'PayPal'}
             {t==='momo' && 'MoMo'}
             {t==='crypto' && 'Crypto'}
+            {t==='qr_bank' && 'Quét QR Ngân Hàng'}
           </button>
         ))}
         <div className="ml-auto">
@@ -216,7 +228,7 @@ export default function PaymentMethodsManagement() {
       {editing && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-soft border border-gray-100 w-full max-w-xl p-6">
-            <h3 className="text-lg font-semibold mb-4">{editing.id ? 'Sửa' : 'Thêm'} — {editing.category==='bank'?'Chuyển khoản':editing.category==='paypal'?'PayPal':editing.category==='momo'?'MoMo':'Crypto'}</h3>
+            <h3 className="text-lg font-semibold mb-4">{editing.id ? 'Sửa' : 'Thêm'} — {editing.category==='bank'?'Chuyển khoản':editing.category==='paypal'?'PayPal':editing.category==='momo'?'MoMo':editing.category==='crypto'?'Crypto':'Quét QR Ngân Hàng'}</h3>
             {/* When adding from 'All', allow choosing category */}
             {!editing.id && tab === 'all' && (
               <div className="mb-3">
@@ -226,6 +238,7 @@ export default function PaymentMethodsManagement() {
                   <option value="paypal">PayPal</option>
                   <option value="momo">MoMo</option>
                   <option value="crypto">Crypto</option>
+                  <option value="qr_bank">Quét QR Ngân Hàng</option>
                 </select>
               </div>
             )}
@@ -328,6 +341,22 @@ export default function PaymentMethodsManagement() {
                     </div>
                   </Field>
                   <Field label="Memo/Tag (nếu có)"><input className="input" value={form.memo_tag||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, memo_tag: e.target.value})))} /></Field>
+                </>
+              )}
+              {editing.category==='qr_bank' && (
+                <>
+                  <Field label="Mã ngân hàng (bank_code)"><input className="input" value={form.bank_code||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, bank_code: e.target.value})))} placeholder="VD: VCB, TCB, MBB" /></Field>
+                  <Field label="Tên ngân hàng"><input className="input" value={form.bank_name||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, bank_name: e.target.value})))} /></Field>
+                  <Field label="Số tài khoản"><input className="input" value={form.account_number||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, account_number: e.target.value})))} /></Field>
+                  <Field label="Chủ tài khoản"><input className="input" value={form.account_holder||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, account_holder: e.target.value})))} /></Field>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <Field label="QR template"><input className="input" value={form.qr_template||'compact2'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, qr_template: e.target.value})))} placeholder="compact | compact2" /></Field>
+                    <Field label="Mẫu mô tả (addInfo)"><input className="input" value={form.description_template||'DH {order_number}'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, description_template: e.target.value})))} placeholder="DH {order_number}" /></Field>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input id="incAmount" type="checkbox" checked={!!form.include_amount} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, include_amount: e.target.checked})))} />
+                    <label htmlFor="incAmount" className="text-sm">Nhúng số tiền vào QR</label>
+                  </div>
                 </>
               )}
               <Field label="Sắp xếp">

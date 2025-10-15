@@ -70,7 +70,7 @@ export default function PaymentsTable() {
   const [createCashForId, setCreateCashForId] = useState<string|null>(null)
 
   // Active payment accounts for dropdowns
-  const [paymentOptions, setPaymentOptions] = useState<{ bank: any[], paypal: any[], momo: any[], crypto: any[] }>({ bank: [], paypal: [], momo: [], crypto: [] })
+  const [paymentOptions, setPaymentOptions] = useState<{ bank: any[], paypal: any[], momo: any[], crypto: any[], qr_bank: any[] }>({ bank: [], paypal: [], momo: [], crypto: [], qr_bank: [] })
 
   useEffect(() => {
     fetchPayments()
@@ -92,7 +92,8 @@ export default function PaymentsTable() {
           bank: data.bank || [],
           paypal: data.paypal || [],
           momo: data.momo || [],
-          crypto: data.crypto || []
+          crypto: data.crypto || [],
+          qr_bank: data.qr_bank || []
         })
       } catch {}
     }

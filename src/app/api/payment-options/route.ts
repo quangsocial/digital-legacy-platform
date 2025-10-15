@@ -5,11 +5,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export async function GET() {
   try {
     const admin = createAdminClient()
-    const [banks, paypals, momos, cryptos] = await Promise.all([
+    const [banks, paypals, momos, cryptos, qrBanks] = await Promise.all([
       admin.from('payment_bank_accounts').select('*').eq('active', true).order('sort_order'),
       admin.from('payment_paypal_accounts').select('*').eq('active', true).order('sort_order'),
       admin.from('payment_momo_accounts').select('*').eq('active', true).order('sort_order'),
       admin.from('payment_crypto_wallets').select('*').eq('active', true).order('sort_order'),
+      admin.from('payment_qr_bank_accounts').select('*').eq('active', true).order('sort_order'),
     ])
 
     return NextResponse.json({
@@ -17,6 +18,7 @@ export async function GET() {
       paypal: paypals.data || [],
       momo: momos.data || [],
       crypto: cryptos.data || [],
+      qr_bank: qrBanks.data || [],
     })
   } catch (e) {
     console.error('GET /payment-options', e)
