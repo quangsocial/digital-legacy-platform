@@ -37,26 +37,11 @@ export default function PaymentsTable() {
     amount: 0,
     currency: 'VND',
     payment_method: 'bank_transfer',
-    // Link to configured account (preferred)
+    // Only link to configured account
     bank_account_id: '',
     paypal_account_id: '',
     momo_account_id: '',
     crypto_wallet_id: '',
-    // Bank transfer details
-    bank_name: '',
-    account_number: '',
-    account_holder: '',
-    bank_branch: '',
-    // MoMo details
-    momo_number: '',
-    momo_account: '',
-    // PayPal details
-    paypal_email: '',
-    // Crypto details
-    crypto_currency: 'USDT',
-    crypto_network: 'BSC',
-    crypto_address: '',
-    crypto_qr_url: '',
     transaction_id: '',
     notes: '',
     admin_notes: ''
@@ -73,30 +58,16 @@ export default function PaymentsTable() {
   const [markPaidId, setMarkPaidId] = useState<string | null>(null)
   const [markPaidForm, setMarkPaidForm] = useState({
     payment_method: 'bank_transfer',
-    // Link to configured account (preferred)
+    // Only link to configured account
     bank_account_id: '',
     paypal_account_id: '',
     momo_account_id: '',
     crypto_wallet_id: '',
-    // Bank transfer details
-    bank_name: '',
-    account_number: '',
-    account_holder: '',
-    bank_branch: '',
-    // MoMo details
-    momo_number: '',
-    momo_account: '',
-    // PayPal details
-    paypal_email: '',
-    // Crypto details
-    crypto_currency: 'USDT',
-    crypto_network: 'BSC',
-    crypto_address: '',
-    crypto_qr_url: '',
     notes: '',
     file: null as File | null,
     proof_url: ''
   })
+  const [createCashForId, setCreateCashForId] = useState<string|null>(null)
 
   // Active payment accounts for dropdowns
   const [paymentOptions, setPaymentOptions] = useState<{ bank: any[], paypal: any[], momo: any[], crypto: any[] }>({ bank: [], paypal: [], momo: [], crypto: [] })
@@ -436,7 +407,6 @@ export default function PaymentsTable() {
                     <div className="flex justify-end gap-2">
                       <button onClick={() => {
                         setEditing(payment)
-                        const pd = (payment as any).paymentDetails || {}
                         setEditForm({
                           amount: payment.amount,
                           currency: payment.currency || 'VND',
@@ -445,28 +415,35 @@ export default function PaymentsTable() {
                           paypal_account_id: '',
                           momo_account_id: '',
                           crypto_wallet_id: '',
-                          // hydrate method-specific fields
-                          bank_name: pd.bank_name || '',
-                          account_number: pd.account_number || '',
-                          account_holder: pd.account_holder || '',
-                          bank_branch: pd.bank_branch || '',
-                          momo_number: pd.momo_number || '',
-                          momo_account: pd.momo_account || '',
-                          paypal_email: pd.paypal_email || '',
-                          crypto_currency: pd.crypto_currency || 'USDT',
-                          crypto_network: pd.crypto_network || 'BSC',
-                          crypto_address: pd.crypto_address || '',
-                          crypto_qr_url: pd.crypto_qr_url || '',
                           transaction_id: payment.transactionId || '',
                           notes: (payment as any).notes || '',
                           admin_notes: (payment as any).adminNotes || ''
                         })
                       }} className="text-gray-700 hover:text-black">Sửa</button>
                       {payment.status === 'new' && (
-                        <button onClick={() => { setMarkPaidId(payment.id); setMarkPaidForm({ payment_method: 'bank_transfer', bank_account_id: '', paypal_account_id: '', momo_account_id: '', crypto_wallet_id: '', bank_name: '', account_number: '', account_holder: '', bank_branch: '', momo_number: '', momo_account: '', paypal_email: '', crypto_currency: 'USDT', crypto_network: 'BSC', crypto_address: '', crypto_qr_url: '', notes: '', file: null, proof_url: '' }) }} disabled={updating===payment.id} className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50">Đánh dấu đã thanh toán</button>
+                        <button onClick={() => { setMarkPaidId(payment.id); setMarkPaidForm({ payment_method: 'bank_transfer', bank_account_id: '', paypal_account_id: '', momo_account_id: '', crypto_wallet_id: '', notes: '', file: null, proof_url: '' }) }} disabled={updating===payment.id} className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50">Đánh dấu đã thanh toán</button>
                       )}
                       {payment.status === 'paid' && (
                         <button onClick={() => updatePaymentStatus(payment.id, 'refunded')} disabled={updating===payment.id} className="text-orange-600 hover:text-orange-900 disabled:opacity-50">Hoàn tiền</button>
+                      )}
+                      {/* Create cash-in voucher icon */}
+                      {payment.status === 'paid' && (
+                        <button title="Tạo phiếu thu cho bill này" onClick={async ()=>{
+                          try {
+                            setUpdating(payment.id)
+                            const res = await fetch('/api/admin/cash-transactions', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'in', category: 'Sales revenue', amount: payment.amount, currency: payment.currency||'VND', date: new Date().toISOString(), notes: `Tạo từ bill ${payment.paymentNumber}`, order_id: (payment as any).orderId || null })
+                            })
+                            if (!res.ok) throw new Error('fail')
+                            alert('✅ Đã tạo phiếu thu')
+                          } catch {
+                            alert('❌ Không tạo được phiếu thu')
+                          } finally {
+                            setUpdating(null)
+                          }
+                        }} className="text-blue-600 hover:text-blue-900" aria-label="Tạo phiếu thu">🧾</button>
                       )}
                     </div>
                   </td>
@@ -565,46 +542,40 @@ export default function PaymentsTable() {
                   </select>
                 </div>
               )}
-              {/* Additional fields per payment method */}
-              {editForm.payment_method === 'bank_transfer' && (
-                <div className="space-y-2">
-                  <input className="input" placeholder="Ngân hàng" value={editForm.bank_name} onChange={e=>setEditForm(f=>({...f, bank_name: e.target.value}))} />
-                  <input className="input" placeholder="Số tài khoản" value={editForm.account_number} onChange={e=>setEditForm(f=>({...f, account_number: e.target.value}))} />
-                  <input className="input" placeholder="Chủ tài khoản" value={editForm.account_holder} onChange={e=>setEditForm(f=>({...f, account_holder: e.target.value}))} />
-                  <input className="input" placeholder="Chi nhánh" value={editForm.bank_branch} onChange={e=>setEditForm(f=>({...f, bank_branch: e.target.value}))} />
-                </div>
-              )}
-              {editForm.payment_method === 'momo' && (
-                <div className="space-y-2">
-                  <input className="input" placeholder="Số MoMo" value={editForm.momo_number} onChange={e=>setEditForm(f=>({...f, momo_number: e.target.value}))} />
-                  <input className="input" placeholder="Chủ ví MoMo" value={editForm.momo_account} onChange={e=>setEditForm(f=>({...f, momo_account: e.target.value}))} />
-                </div>
-              )}
-              {editForm.payment_method === 'paypal' && (
-                <input className="input" placeholder="Email PayPal" value={editForm.paypal_email} onChange={e=>setEditForm(f=>({...f, paypal_email: e.target.value}))} />
-              )}
-              {editForm.payment_method === 'crypto' && (
-                <div className="space-y-2">
-                  <select className="input" value={editForm.crypto_currency} onChange={e=>setEditForm(f=>({...f, crypto_currency: e.target.value}))}>
-                    <option value="USDT">USDT</option>
-                    <option value="BTC">BTC</option>
-                    <option value="ETH">ETH</option>
-                  </select>
-                  <select className="input" value={editForm.crypto_network} onChange={e=>setEditForm(f=>({...f, crypto_network: e.target.value}))}>
-                    <option value="BSC">BNB Chain</option>
-                    <option value="ETH">Ethereum</option>
-                    <option value="TRC20">TRON</option>
-                  </select>
-                  <input className="input" placeholder="Địa chỉ ví" value={editForm.crypto_address} onChange={e=>setEditForm(f=>({...f, crypto_address: e.target.value}))} />
-                  <input className="input" placeholder="URL QR code" value={editForm.crypto_qr_url} onChange={e=>setEditForm(f=>({...f, crypto_qr_url: e.target.value}))} />
-                </div>
-              )}
               <input className="input" placeholder="Mã giao dịch" value={editForm.transaction_id}
                 onChange={(e)=>setEditForm(f=>({...f, transaction_id: e.target.value}))} />
               <textarea className="input" placeholder="Ghi chú" value={editForm.notes}
                 onChange={(e)=>setEditForm(f=>({...f, notes: e.target.value}))} />
               <textarea className="input" placeholder="Ghi chú admin" value={editForm.admin_notes}
                 onChange={(e)=>setEditForm(f=>({...f, admin_notes: e.target.value}))} />
+              {/* Proof upload */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Chứng từ (ảnh/PDF)</label>
+                <input type="file" className="w-full" onChange={async (e)=>{
+                  try {
+                    const file = e.target.files?.[0]
+                    if (!file || !editing) return
+                    const fd = new FormData()
+                    fd.append('file', file)
+                    fd.append('paymentId', editing.id)
+                    const up = await fetch('/api/admin/payments/upload', { method: 'POST', body: fd })
+                    const upJson = await up.json()
+                    if (!up.ok) throw new Error(upJson.error || 'Upload failed')
+                    // save proof_url immediately
+                    await fetch('/api/admin/payments', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: editing.id, proof_url: upJson.url })
+                    })
+                    await fetchPayments()
+                  } catch {
+                    alert('Không tải lên được chứng từ')
+                  }
+                }} />
+                {('proofUrl' in editing) && (editing as any).proofUrl && (
+                  <a className="text-sm text-blue-600 hover:underline mt-1 inline-block" target="_blank" rel="noreferrer" href={(editing as any).proofUrl}>Xem chứng từ hiện tại</a>
+                )}
+              </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button className="btn btn-ghost border border-gray-200" onClick={() => setEditing(null)}>Hủy</button>
@@ -620,23 +591,11 @@ export default function PaymentsTable() {
                       amount: editForm.amount,
                       currency: editForm.currency,
                       payment_method: editForm.payment_method,
-                      // link to configured account
+                      // only link to configured account
                       bank_account_id: editForm.bank_account_id,
                       paypal_account_id: editForm.paypal_account_id,
                       momo_account_id: editForm.momo_account_id,
                       crypto_wallet_id: editForm.crypto_wallet_id,
-                      // method-specific
-                      bank_name: editForm.bank_name,
-                      account_number: editForm.account_number,
-                      account_holder: editForm.account_holder,
-                      bank_branch: editForm.bank_branch,
-                      momo_number: editForm.momo_number,
-                      momo_account: editForm.momo_account,
-                      paypal_email: editForm.paypal_email,
-                      crypto_currency: editForm.crypto_currency,
-                      crypto_network: editForm.crypto_network,
-                      crypto_address: editForm.crypto_address,
-                      crypto_qr_url: editForm.crypto_qr_url,
                       transaction_id: editForm.transaction_id,
                       notes: editForm.notes,
                       admin_notes: editForm.admin_notes
@@ -713,40 +672,6 @@ export default function PaymentsTable() {
                   </select>
                 </div>
               )}
-              {/* Method-specific fields */}
-              {markPaidForm.payment_method === 'bank_transfer' && (
-                <div className="space-y-2">
-                  <input className="input" placeholder="Ngân hàng" value={markPaidForm.bank_name} onChange={e=>setMarkPaidForm(f=>({...f, bank_name: e.target.value}))} />
-                  <input className="input" placeholder="Số tài khoản" value={markPaidForm.account_number} onChange={e=>setMarkPaidForm(f=>({...f, account_number: e.target.value}))} />
-                  <input className="input" placeholder="Chủ tài khoản" value={markPaidForm.account_holder} onChange={e=>setMarkPaidForm(f=>({...f, account_holder: e.target.value}))} />
-                  <input className="input" placeholder="Chi nhánh" value={markPaidForm.bank_branch} onChange={e=>setMarkPaidForm(f=>({...f, bank_branch: e.target.value}))} />
-                </div>
-              )}
-              {markPaidForm.payment_method === 'momo' && (
-                <div className="space-y-2">
-                  <input className="input" placeholder="Số MoMo" value={markPaidForm.momo_number} onChange={e=>setMarkPaidForm(f=>({...f, momo_number: e.target.value}))} />
-                  <input className="input" placeholder="Chủ ví MoMo" value={markPaidForm.momo_account} onChange={e=>setMarkPaidForm(f=>({...f, momo_account: e.target.value}))} />
-                </div>
-              )}
-              {markPaidForm.payment_method === 'paypal' && (
-                <input className="input" placeholder="Email PayPal" value={markPaidForm.paypal_email} onChange={e=>setMarkPaidForm(f=>({...f, paypal_email: e.target.value}))} />
-              )}
-              {markPaidForm.payment_method === 'crypto' && (
-                <div className="space-y-2">
-                  <select className="input" value={markPaidForm.crypto_currency} onChange={e=>setMarkPaidForm(f=>({...f, crypto_currency: e.target.value}))}>
-                    <option value="USDT">USDT</option>
-                    <option value="BTC">BTC</option>
-                    <option value="ETH">ETH</option>
-                  </select>
-                  <select className="input" value={markPaidForm.crypto_network} onChange={e=>setMarkPaidForm(f=>({...f, crypto_network: e.target.value}))}>
-                    <option value="BSC">BNB Chain</option>
-                    <option value="ETH">Ethereum</option>
-                    <option value="TRC20">TRON</option>
-                  </select>
-                  <input className="input" placeholder="Địa chỉ ví" value={markPaidForm.crypto_address} onChange={e=>setMarkPaidForm(f=>({...f, crypto_address: e.target.value}))} />
-                  <input className="input" placeholder="URL QR code" value={markPaidForm.crypto_qr_url} onChange={e=>setMarkPaidForm(f=>({...f, crypto_qr_url: e.target.value}))} />
-                </div>
-              )}
               <textarea className="input" placeholder="Ghi chú (tùy chọn)" value={markPaidForm.notes} onChange={(e)=>setMarkPaidForm(f=>({...f, notes: e.target.value}))} />
               <input type="file" className="w-full" onChange={(e)=>{
                 const file = e.target.files?.[0] || null
@@ -777,19 +702,7 @@ export default function PaymentsTable() {
                       paypal_account_id: markPaidForm.paypal_account_id,
                       momo_account_id: markPaidForm.momo_account_id,
                       crypto_wallet_id: markPaidForm.crypto_wallet_id,
-                      payment_details: {
-                      bank_name: markPaidForm.bank_name,
-                      account_number: markPaidForm.account_number,
-                      account_holder: markPaidForm.account_holder,
-                      bank_branch: markPaidForm.bank_branch,
-                      momo_number: markPaidForm.momo_number,
-                      momo_account: markPaidForm.momo_account,
-                      paypal_email: markPaidForm.paypal_email,
-                      crypto_currency: markPaidForm.crypto_currency,
-                      crypto_network: markPaidForm.crypto_network,
-                      crypto_address: markPaidForm.crypto_address,
-                      crypto_qr_url: markPaidForm.crypto_qr_url,
-                    } })
+                    })
                   })
                   if (!res.ok) throw new Error('Failed to mark as paid')
                   await fetchPayments()

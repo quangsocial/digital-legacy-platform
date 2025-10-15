@@ -1,4 +1,5 @@
 import { DashboardStats } from '@/components/admin/DashboardStats'
+import DashboardCharts from '@/components/admin/DashboardCharts'
 
 export default function AdminDashboard() {
   return (
@@ -10,6 +11,9 @@ export default function AdminDashboard() {
 
       {/* Statistics Cards - Real Data from Database */}
       <DashboardStats />
+
+  {/* Charts and KPIs */}
+  <DashboardCharts />
 
       {/* Info Message */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

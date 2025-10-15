@@ -1,30 +1,32 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 
-type Tab = 'bank' | 'paypal' | 'momo' | 'crypto'
+type Tab = 'all' | 'bank' | 'paypal' | 'momo' | 'crypto'
+type Category = Exclude<Tab, 'all'>
 
 export default function PaymentMethodsManagement() {
-  const [tab, setTab] = useState<Tab>('bank')
+  const [tab, setTab] = useState<Tab>('all')
   const [data, setData] = useState<any>({ bank: [], paypal: [], momo: [], crypto: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string|null>(null)
-  const [editing, setEditing] = useState<{ category: Tab, id?: string }|null>(null)
+  const [editing, setEditing] = useState<{ category: Category, id?: string }|null>(null)
   const [form, setForm] = useState<any>({})
+  const [isPending, startTransition] = useTransition()
 
   // Options
-  const bankOptions = [
+  const bankOptions = useMemo(() => [
     'Vietcombank', 'Techcombank', 'BIDV', 'VietinBank', 'ACB', 'MB', 'TPBank', 'Sacombank', 'VPBank', 'Agribank', 'SHB', 'HDBank', 'OCB', 'SCB', 'Eximbank', 'VIB', 'SeABank', 'PVcomBank', 'Bac A Bank', 'KienlongBank', 'Nam A Bank', 'MSB', 'NCB', 'OceanBank', 'ABBANK', 'LienVietPostBank', 'Saigonbank', 'BaoVietBank', 'CIMB', 'UOB', 'Standard Chartered', 'HSBC', 'ANZ', 'Shinhan'
-  ]
-  const currencyOptions = ['VND','USD','EUR','JPY','GBP','SGD','AUD']
-  const cryptoTokenOptions = ['USDT','USDC','BTC','ETH','BNB','SOL']
-  const cryptoNetworkOptions = [
+  ], [])
+  const currencyOptions = useMemo(() => ['VND','USD','EUR','JPY','GBP','SGD','AUD'], [])
+  const cryptoTokenOptions = useMemo(() => ['USDT','USDC','BTC','ETH','BNB','SOL'], [])
+  const cryptoNetworkOptions = useMemo(() => ([
     { value: 'BSC', label: 'BNB Chain (BEP20)' },
     { value: 'ETH', label: 'Ethereum (ERC20)' },
     { value: 'TRC20', label: 'TRON (TRC20)' },
     { value: 'POLYGON', label: 'Polygon (MATIC)' },
     { value: 'ARB', label: 'Arbitrum' },
     { value: 'SOL', label: 'Solana' },
-  ]
+  ]), [])
 
   const load = async () => {
     try {
@@ -47,20 +49,32 @@ export default function PaymentMethodsManagement() {
     } catch { alert('Không bật/tắt được') }
   }
 
-  const openAdd = (category: Tab) => {
-    setEditing({ category })
-    if (category === 'bank') setForm({ bank_name: '', bank_name_select: 'Vietcombank', bank_name_other: '', account_number: '', account_holder: '', bank_branch: '', currency: 'VND', active: true, sort_order: 0 })
-    if (category === 'paypal') setForm({ paypal_email: '', display_name: '', currency: 'USD', active: true, sort_order: 0 })
-    if (category === 'momo') setForm({ momo_number: '', momo_account: '', qr_url: '', qr_image_url: '', active: true, sort_order: 0 })
-    if (category === 'crypto') setForm({ token: 'USDT', network: 'BSC', address: '', qr_url: '', qr_image_url: '', memo_tag: '', active: true, sort_order: 0 })
+  const openAdd = (category: Category) => {
+    startTransition(() => {
+      setEditing({ category })
+      if (category === 'bank') setForm({ bank_name: '', bank_name_select: bankOptions[0], bank_name_other: '', account_number: '', account_holder: '', bank_branch: '', currency: 'VND', active: true, sort_order: 0 })
+      if (category === 'paypal') setForm({ paypal_email: '', display_name: '', currency: 'USD', active: true, sort_order: 0 })
+      if (category === 'momo') setForm({ momo_number: '', momo_account: '', qr_url: '', qr_image_url: '', active: true, sort_order: 0 })
+      if (category === 'crypto') setForm({ token: 'USDT', network: 'BSC', address: '', qr_url: '', qr_image_url: '', memo_tag: '', active: true, sort_order: 0 })
+    })
   }
-  const openEdit = (category: Tab, item: any) => {
-    setEditing({ category, id: item.id })
-    if (category === 'bank') {
-      setForm({ ...item, bank_name_select: bankOptions.includes(item.bank_name) ? item.bank_name : '__other__', bank_name_other: bankOptions.includes(item.bank_name) ? '' : item.bank_name })
-    } else {
-      setForm({ ...item })
-    }
+  const openEdit = (category: Category, item: any) => {
+    startTransition(() => {
+      setEditing({ category, id: item.id })
+      if (category === 'bank') {
+        setForm({ ...item, bank_name_select: bankOptions.includes(item.bank_name) ? item.bank_name : '__other__', bank_name_other: bankOptions.includes(item.bank_name) ? '' : item.bank_name })
+      } else {
+        setForm({ ...item })
+      }
+    })
+  }
+
+  const changeAddCategory = (newCat: Category) => {
+    // Only use when adding (no id)
+    startTransition(() => {
+      setEditing({ category: newCat })
+      openAdd(newCat)
+    })
   }
 
   const save = async () => {
@@ -103,34 +117,58 @@ export default function PaymentMethodsManagement() {
   )
 
   const renderList = (category: Tab) => {
-    const list: any[] = data[category] || []
-    if (!list.length) return <div className="text-sm text-gray-500">Chưa có cấu hình. Nhấn "Thêm" để tạo.</div>
+    const makeTag = (cat: Tab) => (
+      <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full border mr-2 ${
+        cat==='bank' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+        cat==='paypal' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+        cat==='momo' ? 'bg-pink-50 text-pink-700 border-pink-200' :
+        cat==='crypto' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+      }`}>
+        {cat==='bank' && 'Bank'}
+        {cat==='paypal' && 'PayPal'}
+        {cat==='momo' && 'MoMo'}
+        {cat==='crypto' && 'Crypto'}
+      </span>
+    )
+
+    const items: Array<{ item:any, cat: Exclude<Tab,'all'> }> = category === 'all'
+      ? [
+          ...(data.bank||[]).map((i:any)=>({ item:i, cat:'bank' as const })),
+          ...(data.paypal||[]).map((i:any)=>({ item:i, cat:'paypal' as const })),
+          ...(data.momo||[]).map((i:any)=>({ item:i, cat:'momo' as const })),
+          ...(data.crypto||[]).map((i:any)=>({ item:i, cat:'crypto' as const })),
+        ]
+      : (data[category] || []).map((i:any)=>({ item:i, cat: category as Exclude<Tab,'all'> }))
+
+    if (!items.length) return <div className="text-sm text-gray-500">Chưa có cấu hình. Nhấn "Thêm" để tạo.</div>
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {list.map((item:any) => (
-          <div key={item.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between">
+        {items.map(({ item, cat }) => (
+          <div key={`${cat}-${item.id}`} className="bg-white rounded-xl border border-gray-200 p-4 flex items-start justify-between">
             <div className="text-sm text-gray-700">
-              {category==='bank' && (
+              <div className="mb-1">{makeTag(cat)}</div>
+              {cat==='bank' && (
                 <div>
                   <div className="font-medium">{item.bank_name}</div>
                   <div>{item.account_number} — {item.account_holder}</div>
                   <div className="text-xs text-gray-500">{item.bank_branch} • {item.currency}</div>
                 </div>
               )}
-              {category==='paypal' && (
+              {cat==='paypal' && (
                 <div>
                   <div className="font-medium">{item.display_name || 'PayPal'}</div>
                   <div>{item.paypal_email}</div>
                   <div className="text-xs text-gray-500">{item.currency}</div>
                 </div>
               )}
-              {category==='momo' && (
+              {cat==='momo' && (
                 <div>
                   <div className="font-medium">{item.momo_account}</div>
                   <div>{item.momo_number}</div>
                 </div>
               )}
-              {category==='crypto' && (
+              {cat==='crypto' && (
                 <div>
                   <div className="font-medium">{item.token} — {item.network}</div>
                   <div className="break-all">{item.address}</div>
@@ -139,10 +177,10 @@ export default function PaymentMethodsManagement() {
             </div>
             <div className="flex items-center gap-3">
               <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" checked={!!item.active} onChange={()=>toggle(category, item.id, !item.active)} />
+                <input type="checkbox" className="sr-only peer" checked={!!item.active} onChange={()=>toggle(cat, item.id, !item.active)} />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
-              <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={()=>openEdit(category, item)}>Sửa</button>
+              <button className="text-blue-600 hover:text-blue-800 text-sm" onClick={()=>openEdit(cat, item)}>Sửa</button>
             </div>
           </div>
         ))}
@@ -158,8 +196,9 @@ export default function PaymentMethodsManagement() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(['bank','paypal','momo','crypto'] as Tab[]).map(t => (
+        {(['all','bank','paypal','momo','crypto'] as Tab[]).map(t => (
           <button key={t} onClick={()=>setTab(t)} className={`px-3 py-1.5 rounded-full border ${tab===t ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300'}`}>
+            {t==='all' && 'Tất cả'}
             {t==='bank' && 'Chuyển khoản ngân hàng'}
             {t==='paypal' && 'PayPal'}
             {t==='momo' && 'MoMo'}
@@ -167,7 +206,7 @@ export default function PaymentMethodsManagement() {
           </button>
         ))}
         <div className="ml-auto">
-          <button className="btn btn-primary" onClick={()=>openAdd(tab)}>+ Thêm</button>
+          <button className="btn btn-primary" onClick={()=>openAdd(tab === 'all' ? 'bank' : tab)}>+ Thêm</button>
         </div>
       </div>
 
@@ -178,28 +217,40 @@ export default function PaymentMethodsManagement() {
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-soft border border-gray-100 w-full max-w-xl p-6">
             <h3 className="text-lg font-semibold mb-4">{editing.id ? 'Sửa' : 'Thêm'} — {editing.category==='bank'?'Chuyển khoản':editing.category==='paypal'?'PayPal':editing.category==='momo'?'MoMo':'Crypto'}</h3>
+            {/* When adding from 'All', allow choosing category */}
+            {!editing.id && tab === 'all' && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Chọn loại phương thức</label>
+                <select className="input" value={editing.category} onChange={(e)=>changeAddCategory(e.target.value as Category)}>
+                  <option value="bank">Chuyển khoản ngân hàng</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="momo">MoMo</option>
+                  <option value="crypto">Crypto</option>
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {editing.category==='bank' && (
                 <>
                   <Field label="Tên ngân hàng">
-                    <select className="input" value={form.bank_name_select||'Vietcombank'} onChange={e=>setForm((f:any)=>({...f, bank_name_select: e.target.value}))}>
+                    <select className="input" value={form.bank_name_select||bankOptions[0]} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, bank_name_select: e.target.value})))}>
                       {bankOptions.map(b=> (<option key={b} value={b}>{b}</option>))}
                       <option value="__other__">Khác…</option>
                     </select>
                     {form.bank_name_select==='__other__' && (
-                      <input className="input mt-2" placeholder="Nhập tên ngân hàng" value={form.bank_name_other||''} onChange={e=>setForm((f:any)=>({...f, bank_name_other: e.target.value}))} />
+                      <input className="input mt-2" placeholder="Nhập tên ngân hàng" value={form.bank_name_other||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, bank_name_other: e.target.value})))} />
                     )}
                   </Field>
-                  <Field label="Số tài khoản"><input className="input" value={form.account_number||''} onChange={e=>setForm((f:any)=>({...f, account_number: e.target.value}))} /></Field>
-                  <Field label="Chủ tài khoản"><input className="input" value={form.account_holder||''} onChange={e=>setForm((f:any)=>({...f, account_holder: e.target.value}))} /></Field>
-                  <Field label="Chi nhánh"><input className="input" value={form.bank_branch||''} onChange={e=>setForm((f:any)=>({...f, bank_branch: e.target.value}))} /></Field>
+                  <Field label="Số tài khoản"><input className="input" value={form.account_number||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, account_number: e.target.value})))} /></Field>
+                  <Field label="Chủ tài khoản"><input className="input" value={form.account_holder||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, account_holder: e.target.value})))} /></Field>
+                  <Field label="Chi nhánh"><input className="input" value={form.bank_branch||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, bank_branch: e.target.value})))} /></Field>
                   <Field label="Tiền tệ">
-                    <select className="input" value={form.currency||'VND'} onChange={e=>setForm((f:any)=>({...f, currency: e.target.value}))}>
+                    <select className="input" value={form.currency||'VND'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, currency: e.target.value})))}>
                       {currencyOptions.map(c => (<option key={c} value={c}>{c}</option>))}
                     </select>
                   </Field>
                   <Field label="QR Link">
-                    <input className="input" placeholder="https://...?param=value" value={form.qr_url||''} onChange={e=>setForm((f:any)=>({...f, qr_url: e.target.value}))} />
+                    <input className="input" placeholder="https://...?param=value" value={form.qr_url||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, qr_url: e.target.value})))} />
                   </Field>
                   <Field label="QR Upload">
                     <input type="file" onChange={async (e)=>{
@@ -217,10 +268,10 @@ export default function PaymentMethodsManagement() {
               )}
               {editing.category==='paypal' && (
                 <>
-                  <Field label="Email PayPal"><input className="input" value={form.paypal_email||''} onChange={e=>setForm((f:any)=>({...f, paypal_email: e.target.value}))} /></Field>
-                  <Field label="Tên hiển thị"><input className="input" value={form.display_name||''} onChange={e=>setForm((f:any)=>({...f, display_name: e.target.value}))} /></Field>
+                  <Field label="Email PayPal"><input className="input" value={form.paypal_email||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, paypal_email: e.target.value})))} /></Field>
+                  <Field label="Tên hiển thị"><input className="input" value={form.display_name||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, display_name: e.target.value})))} /></Field>
                   <Field label="Tiền tệ">
-                    <select className="input" value={form.currency||'USD'} onChange={e=>setForm((f:any)=>({...f, currency: e.target.value}))}>
+                    <select className="input" value={form.currency||'USD'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, currency: e.target.value})))}>
                       {currencyOptions.map(c => (<option key={c} value={c}>{c}</option>))}
                     </select>
                   </Field>
@@ -228,11 +279,11 @@ export default function PaymentMethodsManagement() {
               )}
               {editing.category==='momo' && (
                 <>
-                  <Field label="Số MoMo"><input className="input" value={form.momo_number||''} onChange={e=>setForm((f:any)=>({...f, momo_number: e.target.value}))} /></Field>
-                  <Field label="Chủ ví MoMo"><input className="input" value={form.momo_account||''} onChange={e=>setForm((f:any)=>({...f, momo_account: e.target.value}))} /></Field>
+                  <Field label="Số MoMo"><input className="input" value={form.momo_number||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, momo_number: e.target.value})))} /></Field>
+                  <Field label="Chủ ví MoMo"><input className="input" value={form.momo_account||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, momo_account: e.target.value})))} /></Field>
                   <Field label="QR Code">
                     <div className="space-y-2">
-                      <input className="input" placeholder="Hoặc nhập URL" value={form.qr_url||''} onChange={e=>setForm((f:any)=>({...f, qr_url: e.target.value}))} />
+                      <input className="input" placeholder="Hoặc nhập URL" value={form.qr_url||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, qr_url: e.target.value})))} />
                       <input type="file" onChange={async (e)=>{
                         const file = e.target.files?.[0]
                         if (!file) return
@@ -251,19 +302,19 @@ export default function PaymentMethodsManagement() {
               {editing.category==='crypto' && (
                 <>
                   <Field label="Token">
-                    <select className="input" value={form.token||'USDT'} onChange={e=>setForm((f:any)=>({...f, token: e.target.value}))}>
+                    <select className="input" value={form.token||'USDT'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, token: e.target.value})))}>
                       {cryptoTokenOptions.map(t => (<option key={t} value={t}>{t}</option>))}
                     </select>
                   </Field>
                   <Field label="Mạng lưới">
-                    <select className="input" value={form.network||'BSC'} onChange={e=>setForm((f:any)=>({...f, network: e.target.value}))}>
+                    <select className="input" value={form.network||'BSC'} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, network: e.target.value})))}>
                       {cryptoNetworkOptions.map(n => (<option key={n.value} value={n.value}>{n.label}</option>))}
                     </select>
                   </Field>
-                  <Field label="Địa chỉ ví"><input className="input" value={form.address||''} onChange={e=>setForm((f:any)=>({...f, address: e.target.value}))} /></Field>
+                  <Field label="Địa chỉ ví"><input className="input" value={form.address||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, address: e.target.value})))} /></Field>
                   <Field label="QR Code">
                     <div className="space-y-2">
-                      <input className="input" placeholder="Hoặc nhập URL" value={form.qr_url||''} onChange={e=>setForm((f:any)=>({...f, qr_url: e.target.value}))} />
+                      <input className="input" placeholder="Hoặc nhập URL" value={form.qr_url||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, qr_url: e.target.value})))} />
                       <input type="file" onChange={async (e)=>{
                         const file = e.target.files?.[0]
                         if (!file) return
@@ -276,14 +327,14 @@ export default function PaymentMethodsManagement() {
                       }} />
                     </div>
                   </Field>
-                  <Field label="Memo/Tag (nếu có)"><input className="input" value={form.memo_tag||''} onChange={e=>setForm((f:any)=>({...f, memo_tag: e.target.value}))} /></Field>
+                  <Field label="Memo/Tag (nếu có)"><input className="input" value={form.memo_tag||''} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, memo_tag: e.target.value})))} /></Field>
                 </>
               )}
               <Field label="Sắp xếp">
-                <input className="input" type="number" value={form.sort_order ?? 0} onChange={e=>setForm((f:any)=>({...f, sort_order: Number(e.target.value||0)}))} />
+                <input className="input" type="number" value={form.sort_order ?? 0} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, sort_order: Number(e.target.value||0)})))} />
               </Field>
               <Field label="Kích hoạt">
-                <input type="checkbox" checked={!!form.active} onChange={e=>setForm((f:any)=>({...f, active: e.target.checked}))} />
+                <input type="checkbox" checked={!!form.active} onChange={e=>startTransition(()=>setForm((f:any)=>({...f, active: e.target.checked})))} />
               </Field>
             </div>
             <div className="mt-6 flex justify-end gap-3">

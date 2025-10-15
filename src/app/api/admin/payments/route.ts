@@ -93,6 +93,7 @@ export async function GET(request: Request) {
     const formattedPayments = payments?.map((payment: any) => ({
       id: payment.id,
       paymentNumber: payment.payment_number,
+      orderId: payment.order_id || null,
       orderNumber: payment.orders?.order_number || 'N/A',
   customerName: payment.orders?.customer_name || 'N/A',
   customerEmail: payment.orders?.customer_email || null,
@@ -195,6 +196,27 @@ export async function PATCH(request: Request) {
       if (orderErr) throw orderErr
     }
 
+    // If marked paid, auto-create a cash IN voucher
+    if (status === 'paid') {
+      try {
+        const amountNum = Number(data?.amount || 0)
+        if (amountNum > 0) {
+          await admin.from('cash_transactions').insert({
+            txn_type: 'in',
+            category: 'Sales revenue',
+            amount: amountNum,
+            currency: data?.currency || 'VND',
+            txn_date: new Date().toISOString(),
+            notes: `Bill ${data?.payment_number || data?.id} được đánh dấu Đã thanh toán`,
+            order_id: data?.order_id || null,
+          })
+        }
+      } catch (e) {
+        console.error('Auto-create cash IN failed:', e)
+        // Non-fatal
+      }
+    }
+
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error updating payment:', error)
@@ -223,7 +245,7 @@ export async function PUT(request: Request) {
     }
 
   const body = await request.json()
-  const { id, amount, currency, payment_method, transaction_id, notes, admin_notes, payment_details, bank_account_id, paypal_account_id, momo_account_id, crypto_wallet_id } = body
+  const { id, amount, currency, payment_method, transaction_id, notes, admin_notes, proof_url, payment_details, bank_account_id, paypal_account_id, momo_account_id, crypto_wallet_id } = body
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
     const updates: any = {}
@@ -233,6 +255,7 @@ export async function PUT(request: Request) {
   if (transaction_id !== undefined) updates.transaction_id = transaction_id
     if (notes !== undefined) updates.notes = notes
     if (admin_notes !== undefined) updates.admin_notes = admin_notes
+  if (proof_url !== undefined) updates.proof_url = proof_url
     if (payment_details !== undefined || bank_account_id || paypal_account_id || momo_account_id || crypto_wallet_id) {
       const merged: any = { ...(payment_details || {}) }
       if (bank_account_id) merged.bank_account_id = bank_account_id

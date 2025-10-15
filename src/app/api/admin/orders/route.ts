@@ -46,7 +46,13 @@ export async function GET(request: Request) {
         product_variant_id,
         status,
         order_date,
-        created_at
+        created_at,
+        product_variants!orders_product_variant_id_fkey (
+          name,
+          products (
+            name
+          )
+        )
       `)
       .order('created_at', { ascending: false })
 
@@ -61,6 +67,8 @@ export async function GET(request: Request) {
         customerName: order.customer_name || 'Không rõ',
         customerEmail: order.customer_email || '',
         plan: order.plan_name || 'Không rõ',
+        productName: (order as any)?.product_variants?.products?.name || null,
+        variantName: (order as any)?.product_variants?.name || null,
         // keep numeric for UI calculations and formatting
         amount: Number.isFinite(totalNumber) ? totalNumber : 0,
         status: order.status,

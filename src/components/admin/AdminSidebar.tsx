@@ -20,6 +20,11 @@ const menuItems = [
     href: '/admin/orders' 
   },
   { 
+    title: 'Quản lý sản phẩm', 
+    icon: '🛍️', 
+    href: '/admin/products' 
+  },
+  { 
     title: 'Quản lý thanh toán', 
     icon: '💰', 
     href: '/admin/payments' 
@@ -33,6 +38,11 @@ const menuItems = [
     title: 'Quản lý trang', 
     icon: '📄', 
     href: '/admin/pages' 
+  },
+  { 
+    title: 'Phiếu thu/chi', 
+    icon: '🧾', 
+    href: '/admin/cash' 
   },
   { 
     title: 'Cài đặt hệ thống', 
