@@ -18,6 +18,10 @@ interface Order {
   currency?: string
   planId?: string
   productVariantId?: string
+  customerNotes?: string
+  adminNotes?: string
+  customerPhone?: string
+  customerAddress?: string
 }
 
 interface OrdersTableProps {
@@ -48,6 +52,15 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
   const [products, setProducts] = useState<any[]>([])
   const [variants, setVariants] = useState<any[]>([])
   const [selectedProductId, setSelectedProductId] = useState<string>('')
+  const currencyOptions = [
+    { code: 'VND', label: 'VND — Vietnamese Dong' },
+    { code: 'USD', label: 'USD — US Dollar' },
+    { code: 'EUR', label: 'EUR — Euro' },
+    { code: 'JPY', label: 'JPY — Japanese Yen' },
+    { code: 'GBP', label: 'GBP — British Pound' },
+    { code: 'SGD', label: 'SGD — Singapore Dollar' },
+    { code: 'AUD', label: 'AUD — Australian Dollar' },
+  ] as const
 
   useEffect(() => {
     fetchOrders()
@@ -72,6 +85,14 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
     // reset variant selection
     setEditForm(f => ({ ...f, product_variant_id: '' }))
     setSelectedProductId(productId)
+  }
+
+  const onSelectVariant = (variantId: string) => {
+    setEditForm(f => ({ ...f, product_variant_id: variantId }))
+    const v = variants.find((vv: any) => vv.id === variantId)
+    const price = Number(v?.price ?? 0)
+    // Khi đổi gói, cập nhật giá tiền ngay
+    setEditForm(f => ({ ...f, subtotal: price }))
   }
 
   const fetchOrders = async () => {
@@ -142,10 +163,10 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
     setEditForm({
       customer_name: order.customerName || '',
       customer_email: order.customerEmail || '',
-      customer_phone: '',
-      customer_address: '',
-      admin_notes: '',
-      customer_notes: '',
+      customer_phone: order.customerPhone || '',
+      customer_address: order.customerAddress || '',
+      admin_notes: order.adminNotes || '',
+      customer_notes: order.customerNotes || '',
       subtotal: order.subtotal || 0,
       tax: order.tax || 0,
       discount: order.discount || 0,
@@ -496,27 +517,56 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
       {/* Edit Modal */}
       {editing && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Sửa đơn hàng</h3>
-            <div className="space-y-3">
-              <input className="input bg-gray-50 text-gray-600" placeholder="Mã đơn hàng" value={editing?.orderNumber || ''} readOnly />
-              <input className="input" placeholder="Tên khách"
+          <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-4">
+            <h3 className="text-base md:text-lg font-semibold mb-3">Sửa đơn hàng</h3>
+            <div className="space-y-2">
+              <input className="input !px-3 !py-2 text-sm bg-gray-50 text-gray-600" placeholder="Mã đơn hàng" value={editing?.orderNumber || ''} readOnly />
+              <input className="input !px-3 !py-2 text-sm" placeholder="Tên khách"
                 value={editForm.customer_name}
                 onChange={(e) => setEditForm(f => ({...f, customer_name: e.target.value}))} />
-              <input className="input" placeholder="Email"
+              <input className="input !px-3 !py-2 text-sm" placeholder="Email"
                 value={editForm.customer_email}
                 onChange={(e) => setEditForm(f => ({...f, customer_email: e.target.value}))} />
-              <input className="input" placeholder="SĐT"
-                value={editForm.customer_phone}
-                onChange={(e) => setEditForm(f => ({...f, customer_phone: e.target.value}))} />
-              <input className="input" placeholder="Địa chỉ"
-                value={editForm.customer_address}
-                onChange={(e) => setEditForm(f => ({...f, customer_address: e.target.value}))} />
-              <textarea className="input" placeholder="Ghi chú admin"
-                value={editForm.admin_notes}
-                onChange={(e) => setEditForm(f => ({...f, admin_notes: e.target.value}))} />
-              <div className="grid grid-cols-2 gap-3">
-                <select className="input" value={editForm.status}
+              {/* Ghi chú đơn hàng (khách) đưa lên ngay dưới email */}
+              <textarea className="input !px-3 !py-2 text-sm" placeholder="Ghi chú đơn hàng (khách)"
+                value={editForm.customer_notes}
+                onChange={(e) => setEditForm(f => ({...f, customer_notes: e.target.value}))} />
+              {/* Chọn sản phẩm/gói gọn gàng */}
+              <div className="grid grid-cols-1 gap-2">
+                <select className="input !px-3 !py-2 text-sm" onChange={(e) => onSelectProduct(e.target.value)} value={selectedProductId}>
+                  <option value="" disabled>Chọn sản phẩm</option>
+                  {products.map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <select className="input !px-3 !py-2 text-sm" value={editForm.product_variant_id} onChange={(e) => onSelectVariant(e.target.value)}>
+                  <option value="">Chọn gói (variant)</option>
+                  {variants.map((v: any) => (
+                    <option key={v.id} value={v.id}>{v.name} - {Number(v.price || 0).toLocaleString('vi-VN')}₫</option>
+                  ))}
+                </select>
+              </div>
+              {/* Giá và đơn vị tiền tệ trên cùng một hàng */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1">Giá tiền</label>
+                  <input className="input !px-3 !py-2 text-sm" type="number" placeholder="Tổng tiền (Subtotal)"
+                    value={editForm.subtotal}
+                    onChange={(e) => setEditForm(f => ({...f, subtotal: Number(e.target.value)}))} />
+                </div>
+                <div>
+                  <label className="block text-xs text-[var(--muted)] mb-1">Đơn vị tiền tệ</label>
+                  <select className="input !px-3 !py-2 text-sm" value={editForm.currency}
+                    onChange={(e) => setEditForm(f => ({...f, currency: e.target.value }))}>
+                    {currencyOptions.map(c => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {/* Trạng thái */}
+              <div className="grid grid-cols-1 gap-2">
+                <select className="input !px-3 !py-2 text-sm" value={editForm.status}
                   onChange={(e) => setEditForm(f => ({...f, status: e.target.value}))}>
                   <option value="new">Mới</option>
                   <option value="draft">Nháp</option>
@@ -526,42 +576,56 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
                   <option value="cancelled">Đã hủy</option>
                 </select>
               </div>
-              {/* Product and Variant selectors */}
-              <div className="grid grid-cols-2 gap-3">
-                <select className="input" onChange={(e) => onSelectProduct(e.target.value)} value={selectedProductId}>
-                  <option value="" disabled>Chọn sản phẩm</option>
-                  {products.map((p: any) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <select className="input" value={editForm.product_variant_id} onChange={(e) => setEditForm(f => ({...f, product_variant_id: e.target.value}))}>
-                  <option value="">Chọn gói (variant)</option>
-                  {variants.map((v: any) => (
-                    <option key={v.id} value={v.id}>{v.name} - {Number(v.price || 0).toLocaleString('vi-VN')}₫</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <input className="input" type="number" placeholder="Subtotal"
-                  value={editForm.subtotal}
-                  onChange={(e) => setEditForm(f => ({...f, subtotal: Number(e.target.value)}))} />
-                <input className="input" type="number" placeholder="Thuế"
-                  value={editForm.tax}
-                  onChange={(e) => setEditForm(f => ({...f, tax: Number(e.target.value)}))} />
-                <input className="input" type="number" placeholder="Giảm giá"
-                  value={editForm.discount}
-                  onChange={(e) => setEditForm(f => ({...f, discount: Number(e.target.value)}))} />
-              </div>
-              <input className="input" placeholder="Tiền tệ"
-                value={editForm.currency}
-                onChange={(e) => setEditForm(f => ({...f, currency: e.target.value}))} />
-              <textarea className="input" placeholder="Ghi chú đơn hàng (khách)"
-                value={editForm.customer_notes}
-                onChange={(e) => setEditForm(f => ({...f, customer_notes: e.target.value}))} />
+              {/* Thông tin liên hệ - có thể thu gọn */}
+              <details className="rounded-xl border border-gray-200">
+                <summary className="cursor-pointer select-none text-sm px-3 py-2 text-[var(--fg)]">Thông tin liên hệ</summary>
+                <div className="p-3 space-y-2">
+                  <input className="input !px-3 !py-2 text-sm" placeholder="SĐT"
+                    value={editForm.customer_phone}
+                    onChange={(e) => setEditForm(f => ({...f, customer_phone: e.target.value}))} />
+                  <input className="input !px-3 !py-2 text-sm" placeholder="Địa chỉ"
+                    value={editForm.customer_address}
+                    onChange={(e) => setEditForm(f => ({...f, customer_address: e.target.value}))} />
+                </div>
+              </details>
+
+              {/* Thuế & giảm giá (tùy chọn) */}
+              <details className="rounded-xl border border-gray-200">
+                <summary className="cursor-pointer select-none text-sm px-3 py-2 text-[var(--fg)]">Thuế và giảm giá (tùy chọn)</summary>
+                <div className="p-3 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-[var(--muted)] mb-1">Thuế</label>
+                    <input className="input !px-3 !py-2 text-sm" type="number" placeholder="Thuế"
+                    value={editForm.tax}
+                    onChange={(e) => setEditForm(f => ({...f, tax: Number(e.target.value)}))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--muted)] mb-1">Giảm giá</label>
+                    <input className="input !px-3 !py-2 text-sm" type="number" placeholder="Giảm giá"
+                    value={editForm.discount}
+                    onChange={(e) => setEditForm(f => ({...f, discount: Number(e.target.value)}))} />
+                  </div>
+                </div>
+              </details>
+
+              {/* Ghi chú admin để xuống dưới cùng */}
+              <textarea className="input !px-3 !py-2 text-sm" placeholder="Ghi chú admin"
+                value={editForm.admin_notes}
+                onChange={(e) => setEditForm(f => ({...f, admin_notes: e.target.value}))} />
             </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button className="btn btn-ghost border border-gray-200" onClick={() => setEditing(null)}>Hủy</button>
-              <button className="btn btn-primary" onClick={submitEdit} disabled={!!updating}>Lưu</button>
+            {/* Footer with prominent total next to Save */}
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="text-right">
+                <div className="text-[13px] text-gray-500 leading-tight">Tổng tiền</div>
+                <div className="text-red-600 font-semibold text-lg leading-tight">
+                  {Math.max(0, (Number(editForm.subtotal)||0) - (Number(editForm.discount)||0) + (Number(editForm.tax)||0)).toLocaleString('vi-VN')}
+                  <span className="ml-1 text-xs align-middle text-red-500">{editForm.currency}</span>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button className="btn btn-ghost border border-gray-200 text-sm" onClick={() => setEditing(null)}>Hủy</button>
+                <button className="btn btn-primary text-sm" onClick={submitEdit} disabled={!!updating}>Lưu</button>
+              </div>
             </div>
           </div>
         </div>

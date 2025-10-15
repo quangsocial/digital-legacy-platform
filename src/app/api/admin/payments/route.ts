@@ -25,7 +25,9 @@ export async function GET(request: Request) {
 
     // Build filters from query params
     const { searchParams } = new URL(request.url)
-    const q = searchParams.get('q')?.trim() || ''
+  const q = searchParams.get('q')?.trim() || ''
+  const limit = Math.min(Number(searchParams.get('limit') || 50), 200) // cap at 200
+  const page = Math.max(Number(searchParams.get('page') || 1), 1)
     const statusParam = searchParams.get('status') || ''
     const methodParam = searchParams.get('method') || ''
     const from = searchParams.get('from')
@@ -39,7 +41,9 @@ export async function GET(request: Request) {
         id,
         payment_number,
         amount,
+        currency,
         payment_method,
+        payment_details,
         status,
         payment_date,
         transaction_id,
@@ -51,6 +55,7 @@ export async function GET(request: Request) {
           order_number,
           customer_name,
           customer_email,
+          customer_phone,
           product_variant_id,
           product_variants!orders_product_variant_id_fkey (
             name,
@@ -68,7 +73,19 @@ export async function GET(request: Request) {
     if (to) query = query.lte('payment_date', to)
     if (productVariantId) query = query.eq('orders.product_variant_id', productVariantId)
 
-    const { data: payments, error } = await query.order('payment_date', { ascending: false })
+    // Text search across order/payment fields
+    if (q && q.length >= 2) {
+      const like = `*${q}*`
+      query = query.or(
+        `orders.order_number.ilike.${like},orders.customer_name.ilike.${like},orders.customer_email.ilike.${like},orders.customer_phone.ilike.${like},payment_number.ilike.${like},transaction_id.ilike.${like}`
+      )
+    }
+
+    const fromIdx = (page - 1) * limit
+    const toIdx = fromIdx + limit - 1
+    const { data: payments, error } = await query
+      .order('payment_date', { ascending: false })
+      .range(fromIdx, toIdx)
 
     if (error) throw error
 
@@ -77,9 +94,13 @@ export async function GET(request: Request) {
       id: payment.id,
       paymentNumber: payment.payment_number,
       orderNumber: payment.orders?.order_number || 'N/A',
-      customerName: payment.orders?.customer_name || 'N/A',
+  customerName: payment.orders?.customer_name || 'N/A',
+  customerEmail: payment.orders?.customer_email || null,
+  customerPhone: payment.orders?.customer_phone || null,
       amount: Number(payment.amount) || 0,
+      currency: payment.currency || 'VND',
       method: payment.payment_method,
+      paymentDetails: payment.payment_details || {},
       status: payment.status,
       transactionId: payment.transaction_id || null,
       createdAt: payment.payment_date,
@@ -123,7 +144,7 @@ export async function PATCH(request: Request) {
     }
 
   const body = await request.json()
-  const { paymentId, status, payment_method, notes, proof_url } = body
+  const { paymentId, status, payment_method, notes, proof_url, payment_details, bank_account_id, paypal_account_id, momo_account_id, crypto_wallet_id } = body
 
     if (!paymentId || !status) {
       return NextResponse.json(
@@ -144,10 +165,17 @@ export async function PATCH(request: Request) {
     }
 
     // Update payment status (and optional fields)
-    const updatePayload: any = { status }
+  const updatePayload: any = { status }
     if (status === 'paid' && payment_method) updatePayload.payment_method = payment_method
-    if (notes !== undefined) updatePayload.notes = notes
-    if (proof_url !== undefined) updatePayload.proof_url = proof_url
+  if (notes !== undefined) updatePayload.notes = notes
+  if (proof_url !== undefined) updatePayload.proof_url = proof_url
+  // Merge configured account IDs into payment_details
+  const mergedDetails: any = { ...(payment_details || {}) }
+  if (bank_account_id) mergedDetails.bank_account_id = bank_account_id
+  if (paypal_account_id) mergedDetails.paypal_account_id = paypal_account_id
+  if (momo_account_id) mergedDetails.momo_account_id = momo_account_id
+  if (crypto_wallet_id) mergedDetails.crypto_wallet_id = crypto_wallet_id
+  if (Object.keys(mergedDetails).length > 0) updatePayload.payment_details = mergedDetails
 
     const { data, error } = await admin
       .from('payments')
@@ -194,16 +222,25 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const body = await request.json()
-    const { id, amount, payment_method, transaction_id, notes, admin_notes } = body
+  const body = await request.json()
+  const { id, amount, currency, payment_method, transaction_id, notes, admin_notes, payment_details, bank_account_id, paypal_account_id, momo_account_id, crypto_wallet_id } = body
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
     const updates: any = {}
     if (amount !== undefined) updates.amount = Number(amount) || 0
-    if (payment_method !== undefined) updates.payment_method = payment_method
-    if (transaction_id !== undefined) updates.transaction_id = transaction_id
+  if (payment_method !== undefined) updates.payment_method = payment_method
+  if (currency !== undefined) updates.currency = currency
+  if (transaction_id !== undefined) updates.transaction_id = transaction_id
     if (notes !== undefined) updates.notes = notes
     if (admin_notes !== undefined) updates.admin_notes = admin_notes
+    if (payment_details !== undefined || bank_account_id || paypal_account_id || momo_account_id || crypto_wallet_id) {
+      const merged: any = { ...(payment_details || {}) }
+      if (bank_account_id) merged.bank_account_id = bank_account_id
+      if (paypal_account_id) merged.paypal_account_id = paypal_account_id
+      if (momo_account_id) merged.momo_account_id = momo_account_id
+      if (crypto_wallet_id) merged.crypto_wallet_id = crypto_wallet_id
+      updates.payment_details = merged
+    }
 
     const { data, error } = await admin
       .from('payments')

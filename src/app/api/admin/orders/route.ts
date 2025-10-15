@@ -31,6 +31,10 @@ export async function GET(request: Request) {
         order_number,
         customer_name,
         customer_email,
+        customer_phone,
+        customer_address,
+        customer_notes,
+        admin_notes,
         plan_name,
         billing_cycle,
         total,
@@ -70,6 +74,10 @@ export async function GET(request: Request) {
         currency: order.currency || 'VND',
         planId: order.plan_id,
         productVariantId: order.product_variant_id,
+        customerNotes: order.customer_notes || '',
+        adminNotes: order.admin_notes || '',
+        customerPhone: order.customer_phone || '',
+        customerAddress: order.customer_address || '',
       }
     }) || []
 

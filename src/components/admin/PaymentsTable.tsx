@@ -8,6 +8,7 @@ interface Payment {
   orderNumber: string
   customerName: string
   amount: number
+  currency?: string
   method: string
   status: string
   transactionId: string | null
@@ -34,18 +35,71 @@ export default function PaymentsTable() {
   const [editing, setEditing] = useState<Payment | null>(null)
   const [editForm, setEditForm] = useState({
     amount: 0,
+    currency: 'VND',
     payment_method: 'bank_transfer',
+    // Link to configured account (preferred)
+    bank_account_id: '',
+    paypal_account_id: '',
+    momo_account_id: '',
+    crypto_wallet_id: '',
+    // Bank transfer details
+    bank_name: '',
+    account_number: '',
+    account_holder: '',
+    bank_branch: '',
+    // MoMo details
+    momo_number: '',
+    momo_account: '',
+    // PayPal details
+    paypal_email: '',
+    // Crypto details
+    crypto_currency: 'USDT',
+    crypto_network: 'BSC',
+    crypto_address: '',
+    crypto_qr_url: '',
     transaction_id: '',
     notes: '',
     admin_notes: ''
   })
+  const currencyOptions = [
+    { code: 'VND', label: 'VND — Vietnamese Dong' },
+    { code: 'USD', label: 'USD — US Dollar' },
+    { code: 'EUR', label: 'EUR — Euro' },
+    { code: 'JPY', label: 'JPY — Japanese Yen' },
+    { code: 'GBP', label: 'GBP — British Pound' },
+    { code: 'SGD', label: 'SGD — Singapore Dollar' },
+    { code: 'AUD', label: 'AUD — Australian Dollar' },
+  ] as const
   const [markPaidId, setMarkPaidId] = useState<string | null>(null)
   const [markPaidForm, setMarkPaidForm] = useState({
     payment_method: 'bank_transfer',
+    // Link to configured account (preferred)
+    bank_account_id: '',
+    paypal_account_id: '',
+    momo_account_id: '',
+    crypto_wallet_id: '',
+    // Bank transfer details
+    bank_name: '',
+    account_number: '',
+    account_holder: '',
+    bank_branch: '',
+    // MoMo details
+    momo_number: '',
+    momo_account: '',
+    // PayPal details
+    paypal_email: '',
+    // Crypto details
+    crypto_currency: 'USDT',
+    crypto_network: 'BSC',
+    crypto_address: '',
+    crypto_qr_url: '',
     notes: '',
     file: null as File | null,
     proof_url: ''
   })
+
+  // Active payment accounts for dropdowns
+  const [paymentOptions, setPaymentOptions] = useState<{ bank: any[], paypal: any[], momo: any[], crypto: any[] }>({ bank: [], paypal: [], momo: [], crypto: [] })
 
   useEffect(() => {
     fetchPayments()
@@ -58,18 +112,43 @@ export default function PaymentsTable() {
       } catch {}
     }
     loadProducts()
+    // load active payment options
+    const loadPaymentOptions = async () => {
+      try {
+        const res = await fetch('/api/payment-options')
+        const data = await res.json()
+        setPaymentOptions({
+          bank: data.bank || [],
+          paypal: data.paypal || [],
+          momo: data.momo || [],
+          crypto: data.crypto || []
+        })
+      } catch {}
+    }
+    loadPaymentOptions()
   }, [])
+
+  // Auto-refetch when filters change (debounced for q)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchPayments()
+    }, 500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, statusFilter, methodFilter, productFilter, from, to])
 
   const fetchPayments = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
+  const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
       if (methodFilter) params.set('method', methodFilter)
       if (productFilter) params.set('product_variant_id', productFilter)
       if (from) params.set('from', from)
       if (to) params.set('to', to)
-      if (q) params.set('q', q)
+  if (q.length === 0 || q.length >= 2) params.set('q', q)
+  params.set('limit', '50')
+  params.set('page', '1')
       const response = await fetch(`/api/admin/payments?${params.toString()}`)
       
       if (!response.ok) {
@@ -187,64 +266,84 @@ export default function PaymentsTable() {
     <div className="space-y-6">
       {/* Filters */}
       <div className="bg-white rounded-2xl shadow-soft border border-gray-100 p-4">
-        <div className="flex gap-4">
-            <input 
-              value={q} onChange={(e)=>setQ(e.target.value)}
-              placeholder="Tìm: tên, mã đơn, mã bill"
-              className="input flex-1"
-            />
-          <select 
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {/* Text search */}
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tìm: tên, email, SĐT, mã đơn, mã bill, giao dịch"
+            className="input w-full"
+          />
+          {/* Status filter */}
+          <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="input"
+            className="input w-full"
           >
             <option value="">Tất cả trạng thái</option>
-              <option value="new">Mới</option>
-            <option value="pending">Chờ xác nhận</option>
-              <option value="processing">Đang xử lý</option>
-            <option value="confirmed">Đã xác nhận</option>
-              <option value="completed">Hoàn tất</option>
-            <option value="failed">Thất bại</option>
-            <option value="refunded">Đã hoàn tiền</option>
-              <option value="cancelled">Đã hủy</option>
+            <option value="new">Mới</option>
+            <option value="paid">Đã thanh toán</option>
+            <option value="refunded">Hoàn tiền</option>
           </select>
-          <select 
+          {/* Method filter */}
+          <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className="input"
+            className="input w-full"
           >
             <option value="">Tất cả phương thức</option>
             <option value="bank_transfer">Chuyển khoản</option>
-              <option value="momo">Ví MoMo</option>
+            <option value="momo">Ví MoMo</option>
+            <option value="paypal">PayPal</option>
             <option value="crypto">Tiền điện tử</option>
-              <option value="paypal">PayPal</option>
           </select>
-            <select 
-              value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
-              className="input"
-            >
-              <option value="">Tất cả sản phẩm</option>
-              {products.flatMap((p:any) => p.product_variants?.map((v:any) => (
-                <option key={v.id} value={v.id}>{p.name} — {v.name}</option>
-              )))}
-            </select>
-            <input type="date" value={from} onChange={(e)=>setFrom(e.target.value)} className="input" />
-            <input type="date" value={to} onChange={(e)=>setTo(e.target.value)} className="input" />
-          <button 
+          {/* Product filter */}
+          <select
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            className="input w-full"
+          >
+            <option value="">Tất cả sản phẩm</option>
+            {products.flatMap((p: any) =>
+              p.product_variants?.map((v: any) => (
+                <option key={v.id} value={v.id}>
+                  {p.name} — {v.name}
+                </option>
+              ))
+            )}
+          </select>
+          {/* Date from */}
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="input w-full"
+          />
+          {/* Date to */}
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="input w-full"
+          />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button
             onClick={() => {
-                setStatusFilter('')
-                setMethodFilter('')
-                setProductFilter('')
-                setFrom(''); setTo(''); setQ('')
+              setStatusFilter('')
+              setMethodFilter('')
+              setProductFilter('')
+              setFrom('')
+              setTo('')
+              setQ('')
             }}
             className="btn btn-ghost border border-gray-200"
           >
             Reset
           </button>
-          <button 
+          <button
             onClick={fetchPayments}
-            className="ml-auto btn btn-ghost border border-gray-200"
+            className="btn btn-ghost border border-gray-200"
           >
             🔄 Refresh
           </button>
@@ -316,7 +415,7 @@ export default function PaymentsTable() {
                     <div className="text-sm text-gray-900">{payment.customerName}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                    {payment.amount.toLocaleString('vi-VN')}₫
+                    {payment.amount.toLocaleString('vi-VN')} {payment.currency || 'VND'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-900">
@@ -335,9 +434,36 @@ export default function PaymentsTable() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => setEditing(payment)} className="text-gray-700 hover:text-black">Sửa</button>
+                      <button onClick={() => {
+                        setEditing(payment)
+                        const pd = (payment as any).paymentDetails || {}
+                        setEditForm({
+                          amount: payment.amount,
+                          currency: payment.currency || 'VND',
+                          payment_method: (payment as any).method || 'bank_transfer',
+                          bank_account_id: '',
+                          paypal_account_id: '',
+                          momo_account_id: '',
+                          crypto_wallet_id: '',
+                          // hydrate method-specific fields
+                          bank_name: pd.bank_name || '',
+                          account_number: pd.account_number || '',
+                          account_holder: pd.account_holder || '',
+                          bank_branch: pd.bank_branch || '',
+                          momo_number: pd.momo_number || '',
+                          momo_account: pd.momo_account || '',
+                          paypal_email: pd.paypal_email || '',
+                          crypto_currency: pd.crypto_currency || 'USDT',
+                          crypto_network: pd.crypto_network || 'BSC',
+                          crypto_address: pd.crypto_address || '',
+                          crypto_qr_url: pd.crypto_qr_url || '',
+                          transaction_id: payment.transactionId || '',
+                          notes: (payment as any).notes || '',
+                          admin_notes: (payment as any).adminNotes || ''
+                        })
+                      }} className="text-gray-700 hover:text-black">Sửa</button>
                       {payment.status === 'new' && (
-                        <button onClick={() => { setMarkPaidId(payment.id); setMarkPaidForm({ payment_method: 'bank_transfer', notes: '', file: null, proof_url: '' }) }} disabled={updating===payment.id} className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50">Đánh dấu đã thanh toán</button>
+                        <button onClick={() => { setMarkPaidId(payment.id); setMarkPaidForm({ payment_method: 'bank_transfer', bank_account_id: '', paypal_account_id: '', momo_account_id: '', crypto_wallet_id: '', bank_name: '', account_number: '', account_holder: '', bank_branch: '', momo_number: '', momo_account: '', paypal_email: '', crypto_currency: 'USDT', crypto_network: 'BSC', crypto_address: '', crypto_qr_url: '', notes: '', file: null, proof_url: '' }) }} disabled={updating===payment.id} className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50">Đánh dấu đã thanh toán</button>
                       )}
                       {payment.status === 'paid' && (
                         <button onClick={() => updatePaymentStatus(payment.id, 'refunded')} disabled={updating===payment.id} className="text-orange-600 hover:text-orange-900 disabled:opacity-50">Hoàn tiền</button>
@@ -372,15 +498,107 @@ export default function PaymentsTable() {
             <h3 className="text-lg font-semibold mb-4">Sửa thanh toán</h3>
             <div className="space-y-3">
               <input className="input bg-gray-50 text-gray-600" value={editing.paymentNumber} readOnly />
-              <input className="input" type="number" placeholder="Số tiền"
-                value={editForm.amount}
-                onChange={(e)=>setEditForm(f=>({...f, amount: Number(e.target.value)}))} />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Số tiền</label>
+                  <input className="input" type="number" placeholder="Số tiền"
+                    value={editForm.amount}
+                    onChange={(e)=>setEditForm(f=>({...f, amount: Number(e.target.value)}))} />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Đơn vị tiền tệ</label>
+                  <select className="input" value={editForm.currency} onChange={(e)=>setEditForm(f=>({...f, currency: e.target.value}))}>
+                    {currencyOptions.map(c => (
+                      <option key={c.code} value={c.code}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <select className="input" value={editForm.payment_method} onChange={(e)=>setEditForm(f=>({...f, payment_method: e.target.value}))}>
                 <option value="bank_transfer">Chuyển khoản</option>
                 <option value="momo">Ví MoMo</option>
                 <option value="paypal">PayPal</option>
                 <option value="crypto">Tiền điện tử</option>
               </select>
+              {/* Choose configured account instead of retyping */}
+              {editForm.payment_method === 'bank_transfer' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Tài khoản ngân hàng đã cấu hình</label>
+                  <select className="input" value={editForm.bank_account_id} onChange={e=>setEditForm(f=>({...f, bank_account_id: e.target.value}))}>
+                    <option value="">-- Chọn tài khoản --</option>
+                    {paymentOptions.bank.map((b:any)=> (
+                      <option key={b.id} value={b.id}>{b.bank_name} • {b.account_number} — {b.account_holder}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {editForm.payment_method === 'momo' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Ví MoMo đã cấu hình</label>
+                  <select className="input" value={editForm.momo_account_id} onChange={e=>setEditForm(f=>({...f, momo_account_id: e.target.value}))}>
+                    <option value="">-- Chọn ví MoMo --</option>
+                    {paymentOptions.momo.map((m:any)=> (
+                      <option key={m.id} value={m.id}>{m.momo_account} • {m.momo_number}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {editForm.payment_method === 'paypal' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Tài khoản PayPal đã cấu hình</label>
+                  <select className="input" value={editForm.paypal_account_id} onChange={e=>setEditForm(f=>({...f, paypal_account_id: e.target.value}))}>
+                    <option value="">-- Chọn PayPal --</option>
+                    {paymentOptions.paypal.map((p:any)=> (
+                      <option key={p.id} value={p.id}>{p.display_name || p.paypal_email} • {p.currency}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {editForm.payment_method === 'crypto' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Ví Crypto đã cấu hình</label>
+                  <select className="input" value={editForm.crypto_wallet_id} onChange={e=>setEditForm(f=>({...f, crypto_wallet_id: e.target.value}))}>
+                    <option value="">-- Chọn ví --</option>
+                    {paymentOptions.crypto.map((c:any)=> (
+                      <option key={c.id} value={c.id}>{c.token} — {c.network} • {c.address.slice(0,8)}…</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Additional fields per payment method */}
+              {editForm.payment_method === 'bank_transfer' && (
+                <div className="space-y-2">
+                  <input className="input" placeholder="Ngân hàng" value={editForm.bank_name} onChange={e=>setEditForm(f=>({...f, bank_name: e.target.value}))} />
+                  <input className="input" placeholder="Số tài khoản" value={editForm.account_number} onChange={e=>setEditForm(f=>({...f, account_number: e.target.value}))} />
+                  <input className="input" placeholder="Chủ tài khoản" value={editForm.account_holder} onChange={e=>setEditForm(f=>({...f, account_holder: e.target.value}))} />
+                  <input className="input" placeholder="Chi nhánh" value={editForm.bank_branch} onChange={e=>setEditForm(f=>({...f, bank_branch: e.target.value}))} />
+                </div>
+              )}
+              {editForm.payment_method === 'momo' && (
+                <div className="space-y-2">
+                  <input className="input" placeholder="Số MoMo" value={editForm.momo_number} onChange={e=>setEditForm(f=>({...f, momo_number: e.target.value}))} />
+                  <input className="input" placeholder="Chủ ví MoMo" value={editForm.momo_account} onChange={e=>setEditForm(f=>({...f, momo_account: e.target.value}))} />
+                </div>
+              )}
+              {editForm.payment_method === 'paypal' && (
+                <input className="input" placeholder="Email PayPal" value={editForm.paypal_email} onChange={e=>setEditForm(f=>({...f, paypal_email: e.target.value}))} />
+              )}
+              {editForm.payment_method === 'crypto' && (
+                <div className="space-y-2">
+                  <select className="input" value={editForm.crypto_currency} onChange={e=>setEditForm(f=>({...f, crypto_currency: e.target.value}))}>
+                    <option value="USDT">USDT</option>
+                    <option value="BTC">BTC</option>
+                    <option value="ETH">ETH</option>
+                  </select>
+                  <select className="input" value={editForm.crypto_network} onChange={e=>setEditForm(f=>({...f, crypto_network: e.target.value}))}>
+                    <option value="BSC">BNB Chain</option>
+                    <option value="ETH">Ethereum</option>
+                    <option value="TRC20">TRON</option>
+                  </select>
+                  <input className="input" placeholder="Địa chỉ ví" value={editForm.crypto_address} onChange={e=>setEditForm(f=>({...f, crypto_address: e.target.value}))} />
+                  <input className="input" placeholder="URL QR code" value={editForm.crypto_qr_url} onChange={e=>setEditForm(f=>({...f, crypto_qr_url: e.target.value}))} />
+                </div>
+              )}
               <input className="input" placeholder="Mã giao dịch" value={editForm.transaction_id}
                 onChange={(e)=>setEditForm(f=>({...f, transaction_id: e.target.value}))} />
               <textarea className="input" placeholder="Ghi chú" value={editForm.notes}
@@ -400,7 +618,25 @@ export default function PaymentsTable() {
                     body: JSON.stringify({
                       id: editing.id,
                       amount: editForm.amount,
+                      currency: editForm.currency,
                       payment_method: editForm.payment_method,
+                      // link to configured account
+                      bank_account_id: editForm.bank_account_id,
+                      paypal_account_id: editForm.paypal_account_id,
+                      momo_account_id: editForm.momo_account_id,
+                      crypto_wallet_id: editForm.crypto_wallet_id,
+                      // method-specific
+                      bank_name: editForm.bank_name,
+                      account_number: editForm.account_number,
+                      account_holder: editForm.account_holder,
+                      bank_branch: editForm.bank_branch,
+                      momo_number: editForm.momo_number,
+                      momo_account: editForm.momo_account,
+                      paypal_email: editForm.paypal_email,
+                      crypto_currency: editForm.crypto_currency,
+                      crypto_network: editForm.crypto_network,
+                      crypto_address: editForm.crypto_address,
+                      crypto_qr_url: editForm.crypto_qr_url,
                       transaction_id: editForm.transaction_id,
                       notes: editForm.notes,
                       admin_notes: editForm.admin_notes
@@ -432,6 +668,85 @@ export default function PaymentsTable() {
                 <option value="paypal">PayPal</option>
                 <option value="crypto">Tiền điện tử</option>
               </select>
+              {/* Choose configured account */}
+              {markPaidForm.payment_method === 'bank_transfer' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Tài khoản ngân hàng</label>
+                  <select className="input" value={markPaidForm.bank_account_id} onChange={e=>setMarkPaidForm(f=>({...f, bank_account_id: e.target.value}))}>
+                    <option value="">-- Chọn tài khoản --</option>
+                    {paymentOptions.bank.map((b:any)=> (
+                      <option key={b.id} value={b.id}>{b.bank_name} • {b.account_number} — {b.account_holder}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {markPaidForm.payment_method === 'momo' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Ví MoMo</label>
+                  <select className="input" value={markPaidForm.momo_account_id} onChange={e=>setMarkPaidForm(f=>({...f, momo_account_id: e.target.value}))}>
+                    <option value="">-- Chọn ví MoMo --</option>
+                    {paymentOptions.momo.map((m:any)=> (
+                      <option key={m.id} value={m.id}>{m.momo_account} • {m.momo_number}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {markPaidForm.payment_method === 'paypal' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Tài khoản PayPal</label>
+                  <select className="input" value={markPaidForm.paypal_account_id} onChange={e=>setMarkPaidForm(f=>({...f, paypal_account_id: e.target.value}))}>
+                    <option value="">-- Chọn PayPal --</option>
+                    {paymentOptions.paypal.map((p:any)=> (
+                      <option key={p.id} value={p.id}>{p.display_name || p.paypal_email} • {p.currency}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {markPaidForm.payment_method === 'crypto' && (
+                <div className="space-y-2">
+                  <label className="block text-xs text-gray-500">Ví Crypto</label>
+                  <select className="input" value={markPaidForm.crypto_wallet_id} onChange={e=>setMarkPaidForm(f=>({...f, crypto_wallet_id: e.target.value}))}>
+                    <option value="">-- Chọn ví --</option>
+                    {paymentOptions.crypto.map((c:any)=> (
+                      <option key={c.id} value={c.id}>{c.token} — {c.network} • {c.address.slice(0,8)}…</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Method-specific fields */}
+              {markPaidForm.payment_method === 'bank_transfer' && (
+                <div className="space-y-2">
+                  <input className="input" placeholder="Ngân hàng" value={markPaidForm.bank_name} onChange={e=>setMarkPaidForm(f=>({...f, bank_name: e.target.value}))} />
+                  <input className="input" placeholder="Số tài khoản" value={markPaidForm.account_number} onChange={e=>setMarkPaidForm(f=>({...f, account_number: e.target.value}))} />
+                  <input className="input" placeholder="Chủ tài khoản" value={markPaidForm.account_holder} onChange={e=>setMarkPaidForm(f=>({...f, account_holder: e.target.value}))} />
+                  <input className="input" placeholder="Chi nhánh" value={markPaidForm.bank_branch} onChange={e=>setMarkPaidForm(f=>({...f, bank_branch: e.target.value}))} />
+                </div>
+              )}
+              {markPaidForm.payment_method === 'momo' && (
+                <div className="space-y-2">
+                  <input className="input" placeholder="Số MoMo" value={markPaidForm.momo_number} onChange={e=>setMarkPaidForm(f=>({...f, momo_number: e.target.value}))} />
+                  <input className="input" placeholder="Chủ ví MoMo" value={markPaidForm.momo_account} onChange={e=>setMarkPaidForm(f=>({...f, momo_account: e.target.value}))} />
+                </div>
+              )}
+              {markPaidForm.payment_method === 'paypal' && (
+                <input className="input" placeholder="Email PayPal" value={markPaidForm.paypal_email} onChange={e=>setMarkPaidForm(f=>({...f, paypal_email: e.target.value}))} />
+              )}
+              {markPaidForm.payment_method === 'crypto' && (
+                <div className="space-y-2">
+                  <select className="input" value={markPaidForm.crypto_currency} onChange={e=>setMarkPaidForm(f=>({...f, crypto_currency: e.target.value}))}>
+                    <option value="USDT">USDT</option>
+                    <option value="BTC">BTC</option>
+                    <option value="ETH">ETH</option>
+                  </select>
+                  <select className="input" value={markPaidForm.crypto_network} onChange={e=>setMarkPaidForm(f=>({...f, crypto_network: e.target.value}))}>
+                    <option value="BSC">BNB Chain</option>
+                    <option value="ETH">Ethereum</option>
+                    <option value="TRC20">TRON</option>
+                  </select>
+                  <input className="input" placeholder="Địa chỉ ví" value={markPaidForm.crypto_address} onChange={e=>setMarkPaidForm(f=>({...f, crypto_address: e.target.value}))} />
+                  <input className="input" placeholder="URL QR code" value={markPaidForm.crypto_qr_url} onChange={e=>setMarkPaidForm(f=>({...f, crypto_qr_url: e.target.value}))} />
+                </div>
+              )}
               <textarea className="input" placeholder="Ghi chú (tùy chọn)" value={markPaidForm.notes} onChange={(e)=>setMarkPaidForm(f=>({...f, notes: e.target.value}))} />
               <input type="file" className="w-full" onChange={(e)=>{
                 const file = e.target.files?.[0] || null
@@ -457,7 +772,24 @@ export default function PaymentsTable() {
                   const res = await fetch('/api/admin/payments', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ paymentId: markPaidId, status: 'paid', payment_method: markPaidForm.payment_method, notes: markPaidForm.notes, proof_url })
+                    body: JSON.stringify({ paymentId: markPaidId, status: 'paid', payment_method: markPaidForm.payment_method, notes: markPaidForm.notes, proof_url,
+                      bank_account_id: markPaidForm.bank_account_id,
+                      paypal_account_id: markPaidForm.paypal_account_id,
+                      momo_account_id: markPaidForm.momo_account_id,
+                      crypto_wallet_id: markPaidForm.crypto_wallet_id,
+                      payment_details: {
+                      bank_name: markPaidForm.bank_name,
+                      account_number: markPaidForm.account_number,
+                      account_holder: markPaidForm.account_holder,
+                      bank_branch: markPaidForm.bank_branch,
+                      momo_number: markPaidForm.momo_number,
+                      momo_account: markPaidForm.momo_account,
+                      paypal_email: markPaidForm.paypal_email,
+                      crypto_currency: markPaidForm.crypto_currency,
+                      crypto_network: markPaidForm.crypto_network,
+                      crypto_address: markPaidForm.crypto_address,
+                      crypto_qr_url: markPaidForm.crypto_qr_url,
+                    } })
                   })
                   if (!res.ok) throw new Error('Failed to mark as paid')
                   await fetchPayments()
