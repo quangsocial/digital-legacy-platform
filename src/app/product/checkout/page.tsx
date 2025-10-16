@@ -1,9 +1,8 @@
 "use client";
-
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 
-export default function CheckoutPage() {
+function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const orderNumber = searchParams.get('orderNumber') || '';
@@ -42,7 +41,7 @@ export default function CheckoutPage() {
 
         // Build QR code url
         if (qrBankData) {
-          const qrRes = await fetch(`/api/payments/qr?accountId=${qrBankData.id}&orderNumber=${orderNumber}&amount=${data.order.amount}`);
+          const qrRes = await fetch(`/api/payments/qr?accountId=${qrBankData.id}&orderNumber=${orderNumber}&amount=${data.order.total}`);
           const qrData = await qrRes.json();
           if (!qrRes.ok || !qrData.url) throw new Error('Không tạo được mã QR');
           setQrUrl(qrData.url);
@@ -68,9 +67,9 @@ export default function CheckoutPage() {
       {order && (
         <>
           <div className="mb-2">Sản phẩm: <b>{order.product_name || ''}</b></div>
-          <div className="mb-2">Khách hàng: <b>{order.customerName}</b> ({order.customerEmail})</div>
-          <div className="mb-2">Số tiền: <b>{order.amount?.toLocaleString()}₫</b></div>
-          <div className="mb-4">Mã đơn hàng: <b>{order.orderNumber}</b></div>
+          <div className="mb-2">Khách hàng: <b>{order.customer_name}</b> ({order.customer_email})</div>
+          <div className="mb-2">Số tiền: <b>{order.total?.toLocaleString()}₫</b></div>
+          <div className="mb-4">Mã đơn hàng: <b>{(order.order_number || '').replace(/-/g, '')}</b></div>
         </>
       )}
       {loading ? (
@@ -88,5 +87,13 @@ export default function CheckoutPage() {
       )}
       <button className="btn btn-success w-full" onClick={handlePaid} disabled={loading || !!error}>Tôi đã thanh toán</button>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense>
+      <CheckoutPageContent />
+    </Suspense>
   );
 }

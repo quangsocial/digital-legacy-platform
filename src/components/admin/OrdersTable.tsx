@@ -441,7 +441,7 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
               {filteredOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                    <div className="text-sm font-medium text-gray-900">{(order.orderNumber || '').replace(/-/g, '')}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{order.customerName}</div>
@@ -536,7 +536,7 @@ export default function OrdersTable({ refreshTrigger }: OrdersTableProps) {
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-4">
             <h3 className="text-base md:text-lg font-semibold mb-3">Sửa đơn hàng</h3>
             <div className="space-y-2">
-              <input className="input !px-3 !py-2 text-sm bg-gray-50 text-gray-600" placeholder="Mã đơn hàng" value={editing?.orderNumber || ''} readOnly />
+              <input className="input !px-3 !py-2 text-sm bg-gray-50 text-gray-600" placeholder="Mã đơn hàng" value={(editing?.orderNumber || '').replace(/-/g, '')} readOnly />
               <input className="input !px-3 !py-2 text-sm" placeholder="Tên khách"
                 value={editForm.customer_name}
                 onChange={(e) => setEditForm(f => ({...f, customer_name: e.target.value}))} />

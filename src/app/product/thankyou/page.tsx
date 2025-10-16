@@ -1,6 +1,8 @@
+"use client";
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function ThankYouPage() {
+function ThankYouPageContent() {
   const searchParams = useSearchParams();
   const order = searchParams.get('order') || '';
   return (
@@ -10,5 +12,13 @@ export default function ThankYouPage() {
       <div className="mb-4 text-gray-600">Chúng tôi sẽ xác nhận thanh toán và liên hệ với bạn qua email.</div>
       <a href="/product" className="btn btn-primary">Quay về trang sản phẩm</a>
     </div>
+  );
+}
+
+export default function ThankYouPage() {
+  return (
+    <Suspense>
+      <ThankYouPageContent />
+    </Suspense>
   );
 }

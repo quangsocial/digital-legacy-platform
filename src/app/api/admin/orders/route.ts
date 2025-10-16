@@ -61,9 +61,11 @@ export async function GET(request: Request) {
     // Format data for frontend
     const formattedOrders = orders?.map(order => {
       const totalNumber = typeof order.total === 'number' ? order.total : Number(order.total ?? order.subtotal ?? 0)
+      // Remove dashes from order_number for frontend
+      const orderNumber = (order.order_number || '').replace(/-/g, '')
       return {
         id: order.id,
-        orderNumber: order.order_number,
+        orderNumber,
         customerName: order.customer_name || 'Không rõ',
         customerEmail: order.customer_email || '',
         plan: order.plan_name || 'Không rõ',

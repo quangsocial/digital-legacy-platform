@@ -30,7 +30,6 @@ export async function POST(request: Request) {
     const {
       email, // người dùng chỉ nhập email
       product_variant_id,
-      plan_id,
       amount,
       customer_name // optional
     } = body;
@@ -46,25 +45,34 @@ export async function POST(request: Request) {
     }
 
     // Tìm user theo email, nếu chưa có thì tạo mới
-    let { data: userExists, error: userQueryError } = await admin
-      .from('profiles')
-      .select('id, email, full_name')
-      .eq('email', email)
-      .single();
-    console.log('DEBUG: userExists', userExists, 'userQueryError', userQueryError);
-
+    // 1. Check profiles for user by email
     let userId = '';
     let userEmail = email;
     let userFullName = customer_name || '';
-    if (!userExists) {
-      // Tạo user mới với email, sinh password ngẫu nhiên
+    let userProfile = null;
+    let userProfileErr = null;
+    try {
+      const res = await admin
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('email', email)
+        .single();
+      userProfile = res.data;
+      userProfileErr = res.error;
+    } catch (e) {}
+
+    if (userProfile && userProfile.id) {
+      userId = userProfile.id;
+      userEmail = userProfile.email;
+      userFullName = userProfile.full_name || customer_name || userProfile.email;
+    } else {
+      // 2. If not found in profiles, create new user in Supabase Auth
       const password = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4);
       const { data: newUser, error: createUserError } = await admin.auth.admin.createUser({
         email,
         password,
         email_confirm: true
       });
-      console.log('DEBUG: newUser', newUser, 'createUserError', createUserError);
       if (createUserError || !newUser?.user) {
         return NextResponse.json(
           { error: 'Không tạo được user mới', detail: createUserError },
@@ -73,12 +81,17 @@ export async function POST(request: Request) {
       }
       userId = newUser.user.id;
       userEmail = newUser.user.email;
-      // TODO: Gửi email tạo password cho user mới (có thể dùng Supabase hoặc dịch vụ ngoài)
-      // TODO: Gửi email thông báo đơn hàng cho user mới
-    } else {
-      userId = userExists.id;
-      userEmail = userExists.email;
-      userFullName = userExists.full_name || customer_name || userExists.email;
+      // Insert profile cho user mới
+      const { error: profileInsertError } = await admin
+        .from('profiles')
+        .insert({ id: userId, email: userEmail, full_name: customer_name || userEmail });
+      if (profileInsertError && !String(profileInsertError.message).includes('duplicate')) {
+        return NextResponse.json(
+          { error: 'Không tạo được profile cho user', detail: profileInsertError },
+          { status: 400 }
+        );
+      }
+      userFullName = customer_name || userEmail;
     }
 
     // Verify product variant exists (use admin client)
@@ -101,7 +114,8 @@ export async function POST(request: Request) {
   const plan_name = variant.name || variant.plans?.name || 'Unknown Plan';
 
     // Pricing snapshot
-    const subtotal = typeof amount === 'number' && amount > 0 ? amount : Number(variant.price) || 0;
+  // Nếu amount truyền vào là số (kể cả 0), dùng luôn, chỉ fallback sang variant.price nếu amount là undefined/null
+  const subtotal = (typeof amount === 'number' && !isNaN(amount)) ? amount : (Number(variant.price) || 0);
     const tax = 0;
     const discount = 0;
     const total = subtotal - discount + tax;
@@ -112,7 +126,6 @@ export async function POST(request: Request) {
       .from('orders')
       .insert({
         user_id: userId, // Đảm bảo là UUID, không phải email
-        plan_id,
         product_variant_id,
         // schema fields
         customer_name: userFullName,
@@ -148,17 +161,27 @@ export async function POST(request: Request) {
       )
     }
 
+    // Remove dashes from order_number before returning
+    const orderNumber = (order.order_number || '').replace(/-/g, '')
     return NextResponse.json({
       success: true,
       order: {
-        id: order.id,
-        orderNumber: order.order_number,
-        customerName: order.profiles.full_name || order.profiles.email,
-        customerEmail: order.profiles.email,
-        plan: order.plans?.name || order.plan_name || null,
-        amount: (order.total ?? order.subtotal ?? subtotal),
+        id: order.id, // UUID v4
+        order_number: orderNumber, // text, e.g. ORD2025100001
+        customer_name: order.customer_name,
+        customer_email: order.customer_email,
+        plan_name: order.plan_name,
+        billing_cycle: order.billing_cycle,
+        subtotal: order.subtotal,
+        tax: order.tax,
+        discount: order.discount,
+        total: order.total,
         status: order.status,
-        createdAt: order.created_at,
+        order_date: order.order_date,
+        created_at: order.created_at,
+        // Optionally include related info if needed
+        profiles: order.profiles,
+        plans: order.plans,
       },
       message: 'Order created successfully'
     }, { status: 201 })
